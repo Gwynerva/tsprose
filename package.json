@@ -1,0 +1,49 @@
+{
+  "name": "tsprose",
+  "version": "0.0.1",
+  "type": "module",
+  "description": "📜 Write and parse any prose in TypeScript TSX!",
+  "license": "MIT",
+  "keywords": [
+    "prose",
+    "typescript",
+    "tsx",
+    "text-processor",
+    "parser"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Gwynerva/tsprose.git"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./jsx-runtime": {
+      "import": "./dist/jsx-runtime.js",
+      "types": "./dist/jsx-runtime.d.ts"
+    },
+    "./jsx-dev-runtime": {
+      "import": "./dist/jsx-dev-runtime.js",
+      "types": "./dist/jsx-dev-runtime.d.ts"
+    },
+    "./externals": "./dist/externals.d.ts"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "rm -rf dist && bun tsc --project ./tsconfig.src.json && bun postBuild.ts",
+    "prepack": "bun run build",
+    "test": "bun vitest run",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "prettier": "^3.8.1",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
+  }
+}
