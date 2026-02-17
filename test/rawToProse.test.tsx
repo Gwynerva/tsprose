@@ -81,4 +81,29 @@ describe('rawToProse', () => {
       children: [{ data: 'There once was a boy named Harry.' }],
     });
   });
+
+  it('should apply custom slugify to generated ids', async () => {
+    const slugify = (str: string) =>
+      str.toLowerCase().replace(/[^a-z0-9]+/g, '_');
+
+    const rawProse = (
+      <>
+        <Image src="cupboard" />
+        <P>Hello world</P>
+      </>
+    );
+
+    const { takenIds } = await rawToProse({
+      rawProse,
+      slugify,
+    });
+
+    const ids = [...takenIds.keys()];
+    for (const id of ids) {
+      expect(id).toContain('_');
+      expect(id).not.toContain('-');
+      expect(id).toBe(slugify(id));
+    }
+    expect(ids.length).toBeGreaterThan(0);
+  });
 });

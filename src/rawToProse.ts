@@ -5,7 +5,7 @@ import type {
 } from './element.js';
 import { makeProseElement } from './elementUtils.js';
 import { TSProseError } from './error.js';
-import { defaultIdMaker, type IdMaker } from './id.js';
+import { defaultIdMaker, type IdMaker, type TakenIds } from './id.js';
 import { isWalkStop, walkPost } from './walk.js';
 
 export type RawToProseStep = (elements: {
@@ -15,21 +15,22 @@ export type RawToProseStep = (elements: {
 
 export interface RawToProseResult {
   prose: ProseElement;
-  takenIds: Set<string>;
+  takenIds: TakenIds;
   uniques: Record<string, LinkableProseElement>;
 }
 
 export async function rawToProse(args: {
   rawProse: RawElement;
-  takenIds?: Set<string>;
+  takenIds?: TakenIds;
   pre?: (rawElement: RawElement) => void | Promise<void>;
   post?: (proseElement: ProseElement) => void | Promise<void>;
   step?: RawToProseStep;
   idMaker?: IdMaker;
+  slugify?: (str: string) => string;
 }): Promise<RawToProseResult> {
-  const { rawProse, pre, post, step } = args;
+  const { rawProse, pre, post, step, slugify } = args;
   const idMaker = args.idMaker || defaultIdMaker;
-  const takenIds = new Set<string>(args.takenIds);
+  const takenIds: TakenIds = new Map(args.takenIds);
   const uniques: Record<string, LinkableProseElement> = {};
 
   const prose = await walkPost<RawElement, ProseElement>(
@@ -54,19 +55,19 @@ export async function rawToProse(args: {
       }
 
       if (rawElement.schema.linkable) {
-        const elementId = idMaker(rawElement, takenIds);
+        const elementId = idMaker({ rawElement, takenIds, slugify });
         if (takenIds.has(elementId)) {
           throw new TSProseError(
             `Element ID collision: "${elementId}" is already taken!\nMake sure "idMaker" you are using generates non-repeating IDs!`,
           );
         }
         proseElement.id = elementId;
-        takenIds.add(elementId);
+        takenIds.set(elementId, proseElement);
 
         if (rawElement.uniqueName) {
           if (uniques[rawElement.uniqueName]) {
             throw new TSProseError(
-              `Duplicate uniqueName: "${rawElement.uniqueName}" is already used by another element!\nIf you are using document prose, make sure not to directly insert imported or manually created external uniques as they might intersect with document uniques!`,
+              `Duplicate uniqueName: "${rawElement.uniqueName}" is already used by another element!\nIf you are using document prose, make sure not to directly insert imported or manually created external uniques as their names might intersect with document-level uniques names!`,
             );
           }
           uniques[rawElement.uniqueName] = proseElement as LinkableProseElement;
