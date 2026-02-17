@@ -14,6 +14,9 @@ Write and structure prose content using TypeScript TSX with strong typing.
 
 TSProse is a **parser + structurer**: you write content in TSX, TSProse turns it into a typed element tree. Rendering, styling, and analysis are up to you.
 
+Think of TSProse as a TeX but written in TypeScript.
+It is a foundation for writing prose. What tags you define and what you do with the prose (render to site or pdf, analyze, serialize, etc) is up to you.
+
 ## Installation
 
 ```bash
