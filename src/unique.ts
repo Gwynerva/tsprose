@@ -114,7 +114,7 @@ export function defineAutoUnique(uniqueParameters: {
       }
       rawElement = value;
     },
-  };
+  } as AutoUnique;
 }
 
 export function isUnique<Tag extends LinkableTag>(
