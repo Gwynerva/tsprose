@@ -50,22 +50,24 @@ export type LinkableRawElement = ToRawElement<LinkableSchema>;
 
 export const PROSE_ELEMENT_PREFIX = '__TSPROSE_proseElement';
 
-export type ToProseElement<TSchema extends Schema> = {
-  [PROSE_ELEMENT_PREFIX]: true;
-  schema: TSchema;
-  id: false extends TSchema['linkable']
-    ? TSchema['linkable'] extends false
-      ? undefined
-      : string | undefined
-    : string;
-  data: TSchema['Data'];
-  storageKey: false extends TSchema['Storage']
-    ? TSchema['linkable'] extends false
-      ? undefined
-      : undefined | string
-    : string;
-  children: ToProseElementChildren<TSchema['Children']>;
-};
+export type ToProseElement<TSchema extends Schema> = TSchema extends Schema
+  ? {
+      [PROSE_ELEMENT_PREFIX]: true;
+      schema: TSchema;
+      id: false extends TSchema['linkable']
+        ? TSchema['linkable'] extends false
+          ? undefined
+          : string | undefined
+        : string;
+      data: TSchema['Data'];
+      storageKey: false extends TSchema['Storage']
+        ? TSchema['linkable'] extends false
+          ? undefined
+          : undefined | string
+        : string;
+      children: ToProseElementChildren<TSchema['Children']>;
+    }
+  : never;
 
 type ToProseElementChildren<TChildren> = TChildren extends undefined
   ? undefined
