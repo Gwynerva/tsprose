@@ -97,6 +97,38 @@ describe('Children transformation', () => {
     >();
   });
 
+  it('[FooSchema, BarSchema] -> [FooRawElement, BarRawElement]', () => {
+    interface ParentSchema extends BlockSchema {
+      name: 'parent';
+      linkable: false;
+      Data: undefined;
+      Storage: undefined;
+      Children: [FooSchema, BarSchema];
+    }
+
+    type Children = ToRawElement<ParentSchema>['children'];
+
+    expectTypeOf<Children>().toEqualTypeOf<
+      [ToRawElement<FooSchema>, ToRawElement<BarSchema>]
+    >();
+  });
+
+  it('[FooSchema, BarSchema] | undefined -> [FooRawElement, BarRawElement] | undefined', () => {
+    interface ParentSchema extends BlockSchema {
+      name: 'parent';
+      linkable: false;
+      Data: undefined;
+      Storage: undefined;
+      Children: [FooSchema, BarSchema] | undefined;
+    }
+
+    type Children = ToRawElement<ParentSchema>['children'];
+
+    expectTypeOf<Children>().toEqualTypeOf<
+      [ToRawElement<FooSchema>, ToRawElement<BarSchema>] | undefined
+    >();
+  });
+
   it('SingleSchema[] -> ToRawElement<SingleSchema>[]', () => {
     interface ParentSchema extends BlockSchema {
       name: 'parent';

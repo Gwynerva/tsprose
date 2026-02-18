@@ -28,11 +28,14 @@ export type ToRawElement<
     }
   : never;
 
-type ToRawElementChildren<TChildren> = TChildren extends (infer E extends
-  Schema)[]
-  ? ToRawElement<E>[]
-  : TChildren extends undefined
-    ? undefined
+type ToRawElementChildren<TChildren> = TChildren extends undefined
+  ? undefined
+  : TChildren extends readonly Schema[]
+    ? {
+        [K in keyof TChildren]: TChildren[K] extends Schema
+          ? ToRawElement<TChildren[K]>
+          : TChildren[K];
+      }
     : never;
 
 export type RawElement = ToRawElement<Schema>;
@@ -55,11 +58,14 @@ export type ToProseElement<TSchema extends Schema> = {
   children: ToProseElementChildren<TSchema['Children']>;
 };
 
-type ToProseElementChildren<TChildren> = TChildren extends (infer E extends
-  Schema)[]
-  ? ToProseElement<E>[]
-  : TChildren extends undefined
-    ? undefined
+type ToProseElementChildren<TChildren> = TChildren extends undefined
+  ? undefined
+  : TChildren extends readonly Schema[]
+    ? {
+        [K in keyof TChildren]: TChildren[K] extends Schema
+          ? ToProseElement<TChildren[K]>
+          : TChildren[K];
+      }
     : never;
 
 export type ProseElement = ToProseElement<Schema>;
