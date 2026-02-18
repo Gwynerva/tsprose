@@ -56,6 +56,11 @@ export async function rawToProse(args: {
 
       if (rawElement.schema.linkable) {
         const elementId = idMaker({ rawElement, takenIds, slugify });
+        if (!elementId.trim()) {
+          throw new TSProseError(
+            `Empty ID generated from "${rawElement.schema.name}" element!\nThis might happen because of wrongly configured "idMaker" or obscure element data that was passed to create an ID!`,
+          );
+        }
         if (takenIds.has(elementId)) {
           throw new TSProseError(
             `Element ID collision: "${elementId}" is already taken!\nMake sure "idMaker" you are using generates non-repeating IDs!`,

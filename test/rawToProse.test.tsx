@@ -106,4 +106,15 @@ describe('rawToProse', () => {
     }
     expect(ids.length).toBeGreaterThan(0);
   });
+
+  it('should throw if idMaker generates empty id', async () => {
+    const rawProse = <Image src="cupboard" />;
+
+    await expect(
+      rawToProse({
+        rawProse,
+        idMaker: () => '   ',
+      }),
+    ).rejects.toThrowError('Empty ID generated from "image" element!');
+  });
 });
