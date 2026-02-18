@@ -3,6 +3,7 @@ import type {
   InlinerSchema,
   LinkableSchema,
   Schema,
+  SchemaLinkable,
 } from './schema.js';
 
 //
@@ -52,9 +53,17 @@ export const PROSE_ELEMENT_PREFIX = '__TSPROSE_proseElement';
 export type ToProseElement<TSchema extends Schema> = {
   [PROSE_ELEMENT_PREFIX]: true;
   schema: TSchema;
-  id: TSchema['linkable'] extends false ? undefined : string;
+  id: false extends TSchema['linkable']
+    ? TSchema['linkable'] extends false
+      ? undefined
+      : string | undefined
+    : string;
   data: TSchema['Data'];
-  storageKey: TSchema['Storage'] extends undefined ? undefined : string;
+  storageKey: false extends TSchema['Storage']
+    ? TSchema['linkable'] extends false
+      ? undefined
+      : undefined | string
+    : string;
   children: ToProseElementChildren<TSchema['Children']>;
 };
 
