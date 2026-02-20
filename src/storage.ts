@@ -9,16 +9,23 @@ export interface ProseWithStorage {
   storage: ProseStorage;
 }
 
+// Method shorthand extraction produces a bivariant function, allowing
+// specific creators (e.g. ElementStorageCreator<BoldSchema>) to be stored
+// in a Record<string, ElementStorageCreator<Schema>> without contravariance errors.
+interface _StorageCreatorMethod<TSchema extends Schema> {
+  creator(
+    element: ToProseElement<TSchema>,
+  ): null | TSchema['Storage'] | Promise<null | TSchema['Storage']>;
+}
+
 export type ElementStorageCreator<TSchema extends Schema> =
   TSchema['Storage'] extends undefined
     ? never
-    : (
-        element: ToProseElement<TSchema>,
-      ) => null | TSchema['Storage'] | Promise<null | TSchema['Storage']>;
+    : _StorageCreatorMethod<TSchema>['creator'];
 
 export async function fillProseStorage(args: {
   prose: ProseElement;
-  storageCreators: Record<string, ElementStorageCreator<any>>;
+  storageCreators: Record<string, ElementStorageCreator<Schema>>;
   alterValue?: (args: {
     element: ToProseElement<Schema>;
     storageKey: string;
