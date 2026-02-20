@@ -5,6 +5,7 @@ import {
   DOCUMENT_AUTO_ID,
   DOCUMENT_PREFIX,
   injectDocumentId,
+  isDocument,
 } from '@src/document';
 import { isRawElement } from '@src/elementUtils';
 
@@ -62,6 +63,24 @@ describe('defineDocument', () => {
     const pElement = doc.rawProse as ParagraphRawElement;
     expect(isRawElement(pElement, paragraphSchema)).toBe(true);
     expect(pElement.uniqueName).toBe('auto-unique-1');
+  });
+});
+
+describe('isDocument', () => {
+  it('should return true for a valid document', () => {
+    const doc = defineDocument()(() => <P>Hello</P>);
+    expect(isDocument(doc)).toBe(true);
+  });
+
+  it('should return false for an object without the document prefix', () => {
+    expect(isDocument(null)).toBe(false);
+    expect(isDocument(undefined)).toBe(false);
+    expect(isDocument({})).toBe(false);
+    expect(isDocument({ documentId: 'not-a-doc' })).toBe(false);
+    expect(isDocument('string')).toBe(false);
+    expect(isDocument(123)).toBe(false);
+    expect(isDocument([])).toBe(false);
+    expect(isDocument(true)).toBe(false);
   });
 });
 

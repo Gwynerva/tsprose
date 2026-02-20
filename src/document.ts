@@ -118,6 +118,14 @@ export function defineDocument(
 }
 
 //
+// isDocument
+//
+
+export function isDocument(document: any): document is Document {
+  return Boolean(document?.[DOCUMENT_PREFIX] === true);
+}
+
+//
 // injectDocumentId
 //
 
