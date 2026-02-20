@@ -29,6 +29,10 @@ export function makeRawElement<
 
   parameters.elementHandler?.(element as any);
 
+  if (Array.isArray(element.children) && element.children.length === 0) {
+    delete (element as any).children;
+  }
+
   element.hash = hash(
     element.schema.name +
       JSON.stringify(element.data) +
@@ -49,6 +53,10 @@ export function makeProseElement<
   } as ToProseElement<TSchema>;
 
   parameters.elementHandler?.(element as any);
+
+  if (Array.isArray(element.children) && element.children.length === 0) {
+    delete (element as any).children;
+  }
 
   return element as ToProseElement<TSchema>;
 }

@@ -49,6 +49,17 @@ describe('makeRawElement', () => {
     });
     expect(el.data).toEqual({ serif: true });
   });
+
+  it('should not set children: [] when elementHandler assigns empty array', () => {
+    const el = makeRawElement({
+      schema: paragraphSchema,
+      tagName: 'P',
+      elementHandler: (element) => {
+        (element as any).children = [];
+      },
+    });
+    expect('children' in el).toBe(false);
+  });
 });
 
 describe('makeProseElement', () => {
@@ -74,6 +85,16 @@ describe('makeProseElement', () => {
     expect(el.__TSPROSE_proseElement).toBe(true);
     expect(el.schema.name).toBe('bold');
     expect(el.schema.type).toBe('inliner');
+  });
+
+  it('should not set children: [] when elementHandler assigns empty array', () => {
+    const el = makeProseElement({
+      schema: paragraphSchema,
+      elementHandler: (element) => {
+        (element as any).children = [];
+      },
+    });
+    expect('children' in el).toBe(false);
   });
 });
 

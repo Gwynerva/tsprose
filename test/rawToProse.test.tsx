@@ -107,6 +107,30 @@ describe('rawToProse', () => {
     expect(ids.length).toBeGreaterThan(0);
   });
 
+  it('should not set children: [] on leaf RawElement or ProseElement', async () => {
+    // Image has Children: undefined — a leaf element
+    const rawImage = <Image src="test" />;
+
+    // RawElement must not have children: [] set by makeRawElement
+    expect('children' in rawImage).toBe(false);
+
+    // ProseElement must not have children: [] set by rawToProse
+    const { prose } = await rawToProse({ rawProse: rawImage });
+    expect('children' in prose).toBe(false);
+
+    // Same check for a mix (fragment) wrapping leaf elements
+    const rawProse = (
+      <>
+        <Image src="a" />
+        <Image src="b" />
+      </>
+    );
+    const { prose: proseMix } = await rawToProse({ rawProse });
+    for (const child of proseMix.children!) {
+      expect('children' in child).toBe(false);
+    }
+  });
+
   it('should throw if idMaker generates empty id', async () => {
     const rawProse = <Image src="cupboard" />;
 

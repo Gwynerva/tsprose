@@ -50,7 +50,7 @@ export async function rawToProse(args: {
       if (rawElement.storageKey) {
         proseElement.storageKey = rawElement.storageKey;
       }
-      if (children) {
+      if (children && children.length > 0) {
         proseElement.children = children;
       }
 
