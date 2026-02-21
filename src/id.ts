@@ -13,12 +13,10 @@ export const defaultIdMaker: IdMaker = ({ rawElement, takenIds, slugify }) => {
 
   const humanReadable = rawElement.uniqueName || rawElement.slug;
   if (humanReadable) {
-    id = humanReadable;
+    id = slugify ? slugify(humanReadable) : humanReadable;
   } else {
     id = rawElement.schema.name + '-' + rawElement.hash.substring(0, 9);
   }
-
-  id = slugify ? slugify(id) : id;
 
   if (takenIds) {
     if (rawElement.uniqueName) {
@@ -27,11 +25,8 @@ export const defaultIdMaker: IdMaker = ({ rawElement, takenIds, slugify }) => {
         const collidingProse = takenIds.get(id)!;
         takenIds.delete(id);
 
-        let newIdForColliding =
+        const newIdForColliding =
           collidingProse.schema.name + '-' + collidingProse.id;
-        newIdForColliding = slugify
-          ? slugify(newIdForColliding)
-          : newIdForColliding;
 
         let candidate = newIdForColliding;
         let counter = 1;
