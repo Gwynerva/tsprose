@@ -30,7 +30,8 @@
       "import": "./dist/jsx-dev-runtime.js",
       "types": "./dist/jsx-dev-runtime.d.ts"
     },
-    "./externals": "./dist/externals.d.ts"
+    "./externals": "./dist/externals.d.ts",
+    "./jsx": "./dist/jsx.d.ts"
   },
   "files": [
     "dist"

@@ -7,6 +7,7 @@ export * from './element.js';
 export * from './elementUtils.js';
 export * from './error.js';
 export * from './id.js';
+export * from './jsx-runtime.js';
 export * from './rawToProse.js';
 export * from './schema.js';
 export * from './storage.js';
