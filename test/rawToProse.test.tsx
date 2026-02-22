@@ -82,13 +82,14 @@ describe('rawToProse', () => {
     });
   });
 
-  it('should apply custom slugify to generated ids', async () => {
+  it('should apply custom slugify only to slug-based ids, not auto-generated ids', async () => {
     const slugify = (str: string) =>
       str.toLowerCase().replace(/[^a-z0-9]+/g, '_');
 
+    // src with uppercase and spaces so the slugify effect is unambiguous
     const rawProse = (
       <>
-        <Image src="cupboard" />
+        <Image src="Cupboard Photo" />
         <P>Hello world</P>
       </>
     );
@@ -98,13 +99,24 @@ describe('rawToProse', () => {
       slugify,
     });
 
-    const ids = [...takenIds.keys()];
-    for (const id of ids) {
-      expect(id).toContain('_');
-      expect(id).not.toContain('-');
-      expect(id).toBe(slugify(id));
-    }
-    expect(ids.length).toBeGreaterThan(0);
+    const imageEntry = [...takenIds.entries()].find(
+      ([, el]) => el.schema.name === 'image',
+    )!;
+    const paragraphEntry = [...takenIds.entries()].find(
+      ([, el]) => el.schema.name === 'paragraph',
+    )!;
+
+    // Slug-based ID: slugify IS applied to the element's slug string
+    // Image slug = 'image-slug-Cupboard Photo' → slugified = 'image_slug_cupboard_photo'
+    expect(imageEntry[0]).toBe(slugify('image-slug-Cupboard Photo'));
+    expect(imageEntry[0]).toContain('_');
+    expect(imageEntry[0]).not.toContain('-');
+
+    // Auto-generated ID: slugify is NOT applied (format: schemaName-hashSubstring)
+    expect(paragraphEntry[0]).toMatch(/^paragraph-[A-Za-z0-9]{9}$/);
+    expect(paragraphEntry[0]).toContain('-');
+    // The raw auto-generated id differs from its slugified form
+    expect(paragraphEntry[0]).not.toBe(slugify(paragraphEntry[0]));
   });
 
   it('should not set children: [] on leaf RawElement or ProseElement', async () => {

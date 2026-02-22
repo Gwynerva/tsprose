@@ -1,6 +1,6 @@
 {
   "name": "tsprose",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "type": "module",
   "description": "📜 Write and parse any prose in TypeScript TSX!",
   "license": "MIT",
