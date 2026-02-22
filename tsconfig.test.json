@@ -11,6 +11,7 @@
     "lib": ["ESNext"],
     "jsx": "react-jsx",
     "jsxImportSource": "@src",
+    "types": ["./src/jsx.d.ts", "node"],
     "paths": {
       "@src/*": ["./src/*"]
     }

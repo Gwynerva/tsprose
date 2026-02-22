@@ -1,6 +1,6 @@
 {
   "name": "tsprose",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "type": "module",
   "description": "📜 Write and parse any prose in TypeScript TSX!",
   "license": "MIT",
@@ -43,6 +43,7 @@
     "format": "prettier --write ."
   },
   "devDependencies": {
+    "@types/node": "^25.3.0",
     "prettier": "^3.8.1",
     "typescript": "^5.9.3",
     "vitest": "^4.0.18"
