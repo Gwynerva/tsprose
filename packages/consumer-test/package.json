@@ -1,0 +1,14 @@
+{
+  "name": "@tsprose/consumer-test",
+  "private": true,
+  "type": "module",
+  "description": "Consumes the BUILT tsprose package (dist) exactly like a real project: catches declaration-emit and exports-map problems.",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build": "echo skip",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "tsprose": "workspace:*"
+  }
+}

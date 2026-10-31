@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "jsxImportSource": "tsprose",
+    "types": ["tsprose/externals"]
+  },
+  "include": ["src", "test"]
+}

@@ -1,0 +1,51 @@
+{
+  "name": "vscode-tsprose",
+  "displayName": "TSProse",
+  "description": "Format TSProse prose files with @tsprose/fmt (fast, prose-aware) instead of Prettier.",
+  "version": "0.1.1",
+  "private": true,
+  "publisher": "tsprose",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Formatters"
+  ],
+  "activationEvents": [
+    "onLanguage:typescriptreact",
+    "onLanguage:javascriptreact"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "configuration": {
+      "title": "TSProse",
+      "properties": {
+        "tsprose.fmt.command": {
+          "type": "string",
+          "default": "bunx tsprose-fmt",
+          "description": "Command that runs the formatter (receives --stdin --stdin-filepath <file> [--config <cfg>])."
+        },
+        "tsprose.fmt.config": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the formatter config module (relative to the workspace folder). Empty: no config."
+        },
+        "tsprose.fmt.files": {
+          "type": "string",
+          "default": "**/content/**/*.tsx",
+          "description": "Glob (relative to the workspace) of prose files the formatter handles. Other TSX files are left to your default formatter."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build": "esbuild src/extension.ts --bundle --platform=node --external:vscode --format=cjs --outfile=dist/extension.js",
+    "test": "vitest run",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/vscode": "~1.90.0"
+  }
+}

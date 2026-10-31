@@ -1,0 +1,35 @@
+{
+  "name": "@tsprose/analyzer",
+  "version": "2.0.0-alpha.0",
+  "type": "module",
+  "description": "Static checks for TSProse prose files: nesting, props, refs and whitespace. CLI (tsprose check) and an ESLint plugin.",
+  "license": "MIT",
+  "sideEffects": false,
+  "files": ["dist"],
+  "bin": { "tsprose": "./dist/cli.js" },
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
+    "./eslint": { "types": "./dist/eslint/index.d.ts", "default": "./dist/eslint/index.js" },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@tsprose/transform": "workspace:*",
+    "oxc-parser": "^0.156.0"
+  },
+  "peerDependencies": {
+    "eslint": ">=9",
+    "tsprose": "workspace:*"
+  },
+  "peerDependenciesMeta": {
+    "eslint": { "optional": true }
+  },
+  "devDependencies": {
+    "eslint": "^9.0.0",
+    "tsprose": "workspace:*"
+  }
+}

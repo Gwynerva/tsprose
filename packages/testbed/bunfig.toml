@@ -1,0 +1,3 @@
+preload = ["./src/preload.ts"]
+jsx = "react-jsx"
+jsxImportSource = "tsprose"

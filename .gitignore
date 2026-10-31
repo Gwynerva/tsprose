@@ -1,2 +1,14 @@
 node_modules
 dist
+coverage
+*.tsbuildinfo
+.vitest
+packages/testbed/generated
+*.vsix
+.env*
+*.log
+.DS_Store
+Thumbs.db
+.idea/
+*.cpuprofile
+*.heapsnapshot

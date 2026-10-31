@@ -1,0 +1,27 @@
+{
+  "name": "tsprose",
+  "version": "2.0.0-alpha.0",
+  "type": "module",
+  "description": "Write and structure prose in TypeScript TSX with strong typing: schema-first tags, typed documents, cross references and a compile pipeline.",
+  "license": "MIT",
+  "keywords": ["prose", "typescript", "tsx", "jsx", "markup", "document", "crossref"],
+  "repository": { "type": "git", "url": "git+https://github.com/Gwynerva/tsprose.git" },
+  "sideEffects": false,
+  "files": ["dist"],
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
+    "./jsx-runtime": { "types": "./dist/jsx-runtime.d.ts", "default": "./dist/jsx-runtime.js" },
+    "./jsx-dev-runtime": { "types": "./dist/jsx-dev-runtime.d.ts", "default": "./dist/jsx-dev-runtime.js" },
+    "./externals": { "types": "./dist/externals.d.ts" },
+    "./jsx-global": { "types": "./dist/jsx-global.d.ts" },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json && cp src/externals.d.ts dist/externals.d.ts && cp src/jsx-global.d.ts dist/jsx-global.d.ts",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@noble/hashes": "^2.0.0"
+  }
+}

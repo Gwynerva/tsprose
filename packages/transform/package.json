@@ -1,0 +1,51 @@
+{
+  "name": "@tsprose/transform",
+  "version": "2.0.0-alpha.0",
+  "type": "module",
+  "description": "Source transform for TSProse prose files: a line break between inline content is a space (TeX rule). Plugins for Vite, Rollup, esbuild, webpack, Bun and jiti.",
+  "license": "MIT",
+  "sideEffects": false,
+  "files": ["dist"],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./vite": {
+      "types": "./dist/plugins/unplugin.d.ts",
+      "default": "./dist/plugins/vite.js"
+    },
+    "./rollup": {
+      "types": "./dist/plugins/unplugin.d.ts",
+      "default": "./dist/plugins/rollup.js"
+    },
+    "./esbuild": {
+      "types": "./dist/plugins/unplugin.d.ts",
+      "default": "./dist/plugins/esbuild.js"
+    },
+    "./webpack": {
+      "types": "./dist/plugins/unplugin.d.ts",
+      "default": "./dist/plugins/webpack.js"
+    },
+    "./bun": {
+      "types": "./dist/plugins/bun.d.ts",
+      "default": "./dist/plugins/bun.js"
+    },
+    "./jiti": {
+      "types": "./dist/plugins/jiti.d.ts",
+      "default": "./dist/plugins/jiti.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "test": "vitest run",
+    "report": "bun scripts/report.ts"
+  },
+  "dependencies": {
+    "magic-string": "^1.4.5",
+    "oxc-parser": "^0.156.0",
+    "unplugin": "^3.7.0"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "name": "@tsprose/testbed",
+  "private": true,
+  "type": "module",
+  "description": "An Erudit-like, Open-Math-sized proving ground for TSProse 2.0: a 40-tag kit, a folder loader, corpus compilation, HTML rendering, synthetic corpora and benchmarks.",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build": "echo skip",
+    "test": "vitest run",
+    "gen": "bun bench/generate.ts",
+    "bench": "bun bench/run.ts"
+  },
+  "dependencies": {
+    "@tsprose/analyzer": "workspace:*",
+    "@tsprose/fmt": "workspace:*",
+    "@tsprose/transform": "workspace:*",
+    "tsprose": "workspace:*"
+  }
+}

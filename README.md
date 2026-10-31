@@ -2,153 +2,95 @@
 
 <p></p>
 
-# TSProse
+# TSProse 2.0
 
-Write and structure prose content using TypeScript TSX with strong typing.
+**Write prose in TypeScript TSX. Get a typed, linkable, compilable document tree.**
 
-- Write prose using **TSX** syntax
-- Define **your own** element schemas and tags
-- Link any elements with **"uniques"** system (e.g. for cross-referencing)
-- Convert raw TSX output into a stable, linkable prose tree
-- **Storage** system for attaching async/heavy/reusable data to elements
+TSProse is a markup language *and* a programming language at once: Markdown's ease, TeX's power, TypeScript's types.
+Tags are schema-first definitions whose types are inferred, documents are lazy and addressable, cross references are
+typed handles that a compiler resolves across a whole corpus, and every error comes with a file, a line and a path
+through the tree.
 
-TSProse is a **parser + structurer**: you write content in TSX, TSProse turns it into a typed element tree. Rendering, styling, and analysis are up to you.
+```tsx
+import { defineBlock, defineInline, defineRefs, defineDocument, compile, s } from 'tsprose';
 
-Think of TSProse as a TeX but written in TypeScript.
-It is a foundation for writing prose. What tags you define and what you do with the prose (render to site or pdf, analyze, serialize, etc) is up to you.
-
-## Installation
-
-```bash
-npm install tsprose
-```
-
-Configure your `tsconfig.json` to use TSProse as the JSX runtime:
-
-```jsonc
-{
-  "compilerOptions": {
-    "jsx": "react-jsx",
-    "jsxImportSource": "tsprose",
-  },
-}
-```
-
-## Core idea
-
-The idea is simple — you define schemas and tags, use tags to write raw prose in TSX, convert raw prose to prose with stable IDs and collected uniques, then do whatever you want with the prose tree (render, analyze, serialize, etc):
-
-1. **Schema** — Describes an element’s shape and rules (block vs inliner, linkable or not, typed data/children).
-2. **Tag (TSX)** — The callable you use in TSX files; it creates/configures **raw elements** according to the schema.
-3. **RawElement** — The initial, unprocessed elements produced by evaluating your TSX.
-4. **ProseElement** (via **`rawToProse`** function) — raw elements are transformed into prose elements via `rawToProse()` which assigns stable IDs to linkable elements and collects uniques.
-5. (optional) **Storage** — Attach async/heavy/reusable data to elements (e.g. computed metadata) when needed.
-6. **Use the prose tree** — Render, analyze, serialize, etc.
-
-## Get started (minimal example)
-
-This example defines two elements:
-
-- `paragraph` (block, linkable, optional data)
-- `bold` (inliner, non-linkable)
-
-```ts
-import {
-  defineSchema,
-  defineTag,
-  defineDocument,
-  rawToProse,
-  ensureTagInlinerChildren,
-  ensureTagChildren,
-  type BlockSchema,
-  type InlinerSchema,
-  type TextSchema,
-} from 'tsprose';
-
-//
-// 1. Schemas
-//
-
-interface ParagraphSchema extends BlockSchema {
-  name: 'paragraph';
-  type: 'block';
-  linkable: true;
-  Data: { center?: boolean } | undefined;
-  Storage: undefined;
-  Children: InlinerSchema[];
-}
-
-const paragraphSchema = defineSchema<ParagraphSchema>({
-  name: 'paragraph',
-  type: 'block',
-  linkable: true,
+const B = defineInline({ name: 'bold', children: 'inline' });
+const P = defineBlock({ name: 'paragraph', children: 'inline', ref: 'optional' });
+const Theorem = defineBlock({
+  name: 'theorem',
+  props: { title: s.string() },
+  children: { of: [P], pattern: 'paragraph+' },
+  ref: 'required',
+  data: ({ props }) => ({ slug: props.title.toLowerCase() }),
 });
 
-interface BoldSchema extends InlinerSchema {
-  name: 'bold';
-  type: 'inliner';
-  linkable: false;
-  Data: undefined;
-  Storage: undefined;
-  Children: TextSchema[];
-}
+export const refs = defineRefs(import.meta.url, { pythagoras: Theorem });
 
-const boldSchema = defineSchema<BoldSchema>({
-  name: 'bold',
-  type: 'inliner',
-  linkable: false,
-});
-
-//
-// 2. Tags
-//
-
-const P = defineTag({ tagName: 'P', schema: paragraphSchema })<{ center?: true }>(
-  ({ tagName, props, children, element }) => {
-    ensureTagInlinerChildren(tagName, children);
-    element.children = children;
-
-    if (props.center) {
-      element.data = { center: true };
-    }
-  },
+export default defineDocument(
+  () => (
+    <>
+      <Theorem $={refs.pythagoras} title="Pythagorean theorem">
+        <P>
+          In a right triangle, <B>a² + b² = c²</B>.
+        </P>
+      </Theorem>
+    </>
+  ),
+  { refs },
 );
 
-const B = defineTag({ tagName: 'B', schema: boldSchema })(({ tagName, children, element }) => {
-  // `text` is built-in; strings become text elements automatically.
-  ensureTagInlinerChildren(tagName, children);
-  element.children = children;
-});
-
-//
-// 3. Document (TSX)
-//
-
-const document = defineDocument('my-document-id', {
-  uniques: { intro: P },
-})(({ uniques }) => (
-  <>
-    <P $={uniques.intro} center>
-      Hello <B>world</B>
-    </P>
-  </>
-));
-
-//
-// 4. Convert to prose (stable IDs + collected uniques)
-//
-
-const { prose, uniques } = await rawToProse({ rawProse: document.rawProse });
-
-console.log(prose.schema.name); // "mix" (fragment)
-console.log(uniques.intro.id); // "intro"
+const result = await compile(document, { documentId: 'geometry/pythagoras' });
+result.refs.get('pythagoras')!.id; // "pythagoras"
+result.diagnostics; // [] — or every problem at once, with positions
 ```
 
-## Next steps
+## Packages
 
-- Walk the tree (`walkPre*` / `walkPost*`) to render/analyze
-- Serialize (`toJSON` / `fromJSON`) if you need persistence
-- Attach async data via storage (`fillProseStorage`) when you need it
+| Package | What it is |
+| --- | --- |
+| [`tsprose`](./packages/tsprose) | The core: schema-first tags (`defineBlock`/`defineInline`), tag kits for integrators, lazy documents, typed refs, `compile` (ids, refs, transclusion, hooks, async derived data), walkers, compact JSON. |
+| [`@tsprose/transform`](./packages/transform) | The TeX rules for JSX: **a line break between inline content is a space**, and (opt-in) **a blank line is a paragraph break**. A tiny source transform with Vite/Rollup/esbuild/webpack/Bun/jiti plugins. No more `{' '}`, no `<P>` around every paragraph. |
+| [`@tsprose/analyzer`](./packages/analyzer) | Static checks the type system cannot do (nesting, content models, refs, whitespace): `tsprose check` CLI and an ESLint plugin with autofixes. |
+| [`@tsprose/fmt`](./packages/fmt) | A prose-aware formatter for TSX prose files: fills text by width, never tears an inline element from its punctuation, keeps code outside JSX untouched. ~20 ms on a 3400-line article. |
+| [`vscode-tsprose`](./packages/vscode-tsprose) | A minimal VS Code extension that runs `@tsprose/fmt` on save. |
+| [`@tsprose/testbed`](./packages/testbed) | An Erudit-like, Open-Math-sized proving ground: a 40-tag kit, folder loader, corpus build, HTML rendering, synthetic corpora and benchmarks. |
+
+## The idea in one paragraph
+
+A **tag** is a value: `defineBlock({ name, props, children, ref, data })`. Its runtime shape (prop validation via any
+[Standard Schema](https://standardschema.dev) library or the built-in `s`, a DTD-like content model, ref mode) *is* its
+type. A **kit** (`createTagKit`) lets a site generator add common props, typed meta, paragraph autowrap and hooks to
+every tag once — no re-declared types, no `as any`. A **document** is a lazy function; its **refs** live in a side-effect
+free module so other documents can link to or transclude (`<Include of={…}/>`) its elements by importing nothing but
+handles. `compile` turns a document (or a whole `Corpus`) into stable ids, resolved links with back references,
+numbering, hook results and async **derived** data, collecting **diagnostics with positions** instead of throwing.
+The `Registry` turns the node type into a discriminated union so renderers are exhaustive at compile time.
+
+## Setup
+
+```jsonc
+// tsconfig.json
+{ "compilerOptions": { "jsx": "react-jsx", "jsxImportSource": "tsprose", "types": ["tsprose/externals"] } }
+```
+
+Compile prose with the whitespace rule in the build (Vite shown; Bun, jiti and esbuild adapters exist):
+
+```ts
+import tsprose from '@tsprose/transform/vite';
+export default { plugins: [tsprose()] };
+```
+
+Requires TypeScript 7.1+ (the toolchain is built and tested on `typescript@beta`).
+
+## Development
+
+```bash
+bun install
+bun run check      # typecheck + tests + build + consumer project against dist
+bun run test
+```
+
+The monorepo is on the `v2` branch. 1.x lives in the git history; 2.0 has no compatibility layer by design.
 
 ## License
 
