@@ -6,6 +6,7 @@ import type { KitRuntime } from './kit.js';
 import { isRef, isRefTarget, type Ref } from './ref.js';
 import { validateProps } from './standard.js';
 import { isTag, type AnyTag } from './tag.js';
+import { errorMessage } from './util.js';
 
 /** Extra per-call information passed by the JSX runtime. */
 export interface TagCallContext {
@@ -88,7 +89,9 @@ export function instantiate(tag: AnyTag, rawProps: Record<string, unknown>, ctx?
       refHandle = refArg;
     } else if (isRefTarget(refArg)) {
       // A serialized handle (`{ $ref: { documentId, name } }`), e.g. passed through JSON to a browser-side generator.
-      ref = refArg.$ref.name;
+      if (refArg.$ref.name === undefined) {
+        bag.error('ref/invalid', `<${def.name}> received a whole-document reference as "$" (an element needs a name)`, pos);
+      } else ref = refArg.$ref.name;
     } else {
       bag.error('ref/invalid', `<${def.name}> received an invalid "$" (expected a Ref handle, a serialized { $ref } or a string)`, pos);
     }
@@ -132,7 +135,7 @@ export function instantiate(tag: AnyTag, rawProps: Record<string, unknown>, ctx?
     try {
       node.data = def.data({ props: own.value, children, node, report, state });
     } catch (error) {
-      bag.error('tag/data', `<${def.name}> data() threw: ${(error as Error)?.message ?? String(error)}`, pos);
+      bag.error('tag/data', `<${def.name}> data() threw: ${errorMessage(error)}`, pos);
     }
   }
 
@@ -146,7 +149,7 @@ export function instantiate(tag: AnyTag, rawProps: Record<string, unknown>, ctx?
         report,
       });
     } catch (error) {
-      bag.error('tag/hook', `<${def.name}> kit onElement threw: ${(error as Error)?.message ?? String(error)}`, pos);
+      bag.error('tag/hook', `<${def.name}> kit onElement threw: ${errorMessage(error)}`, pos);
     }
   }
 
@@ -186,7 +189,7 @@ export function createElement(type: unknown, props: Record<string, unknown> | nu
       result = (type as (props: Record<string, unknown>) => unknown)(p);
     } catch (error) {
       const bag = new DiagnosticBag();
-      bag.error('tag/component', `Component ${type.name || '(anonymous)'} threw: ${(error as Error)?.message ?? String(error)}`, pos);
+      bag.error('tag/component', `Component ${type.name || '(anonymous)'} threw: ${errorMessage(error)}`, pos);
       return makeFragment(undefined, pos, bag);
     }
     if (isAnyNode(result) && !Array.isArray(result)) {

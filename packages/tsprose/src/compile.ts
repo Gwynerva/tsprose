@@ -1,20 +1,32 @@
 import { normalizeWhitespace, segmentLooseInline } from './children.js';
-import { Corpus } from './corpus.js';
+import type { Corpus } from './corpus.js';
+import { CorpusIndex, type CorpusIndexOptions, type ResolveFn } from './corpus-index.js';
 import type { BaseDef, DeriveContext } from './def.js';
 import { DiagnosticBag, TSProseError, hasErrors, type Diagnostic, type Severity } from './diagnostics.js';
 import { evaluateDocument, isDocument, ROOT_TYPE, type Document } from './document.js';
-import { REF_HANDLE, getDef, getKit, getRefHandle, makeFragment } from './element.js';
-import { canonicalJson, hashText } from './hash.js';
+import { attachDef, getDef, getKit, getRefHandle, makeFragment } from './element.js';
+import { contentHash, deriveKey } from './json.js';
 import { wrapperOf, type KitRuntime } from './kit.js';
-import { isAnyNode, isTextNode, type AnyNode, type BaseNode } from './node.js';
-import { REFS, isAddressable, isRef, isRefTarget, listRefs, toRefTarget, refSchema, type Address, type Ref, type RefScope, type RefTarget } from './ref.js';
-import { CorpusIndex, type CorpusIndexOptions, type ResolveFn } from './corpus-index.js';
-import { refPropsOfProps } from './standard.js';
+import { isTextNode, type AnyNode, type BaseNode } from './node.js';
+import {
+  REFS,
+  addressOf,
+  isRef,
+  isReferenceValue,
+  listRefs,
+  referenceLabel,
+  refSchema,
+  toRefTarget,
+  type Address,
+  type Ref,
+  type RefScope,
+  type RefTarget,
+} from './ref.js';
 import { slugify as defaultSlugify } from './slugify.js';
-import { s } from './standard.js';
+import { refPropsOfProps, s } from './standard.js';
 import { defineBlock } from './tag.js';
-import { cloneNode, labelOf, nodesInData, walk, walkAsync, type WalkContext } from './walk.js';
-import { nodeToJSON } from './json.js';
+import { errorMessage, runPool } from './util.js';
+import { cloneNode, forEachReference, nodesInData, walk, type WalkContext } from './walk.js';
 
 //
 // Built-in transclusion tag
@@ -29,7 +41,7 @@ export const Include = defineBlock({
   props: { of: refSchema({ kind: 'include' }), meta: s.optional(s.record(s.unknown())) },
 });
 
-/** Non-enumerable marker on transcluded copies: the handle they were included through. */
+/** Non-enumerable marker on transcluded copies: the reference they were included through. */
 const INCLUDE_REF = Symbol.for('tsprose.includeRef');
 
 //
@@ -42,10 +54,14 @@ export interface HookContext {
   readonly document: Document | undefined;
   readonly corpus: Corpus | undefined;
   readonly context: unknown;
+  /** Report a diagnostic; with a node, its position and path (when visited by the walk) are attached. */
   report(code: string, message: string, node?: AnyNode, severity?: Severity): void;
 }
 
-/** Integrator hook: runs in the `index` phase (after ids and refs, before derive). */
+/**
+ * Integrator hook: one walk over the compiled tree after ids, refs, outgoing references and numbering are known,
+ * before derive. `enter`/`leave` run per node; `finish` returns the hook's result (`result.hooks.get(name)`).
+ */
 export interface Hook<R = unknown> {
   readonly name: string;
   enter?(node: AnyNode, walk: WalkContext, ctx: HookContext): void;
@@ -53,6 +69,7 @@ export interface Hook<R = unknown> {
   finish?(ctx: HookContext): R | Promise<R>;
 }
 
+/** Identity helper that infers the hook's result type. */
 export function defineHook<R>(hook: Hook<R>): Hook<R> {
   return hook;
 }
@@ -61,14 +78,17 @@ export function defineHook<R>(hook: Hook<R>): Hook<R> {
 // Options and result
 //
 
+/** A derive function: computes a node's derived value (cached by the node's content, see `deriveKey`). */
 export type DeriveFn = (node: BaseNode, ctx: DeriveContext) => unknown;
 
 export interface CompileOptions {
+  /** Documents that `<Include>` and handles resolve against. */
   readonly corpus?: Corpus | undefined;
-  /** Document id when compiling without a corpus (or to override). */
+  /** Document id when compiling without a corpus (or to override the document's own id). */
   readonly documentId?: string | undefined;
   /** Kit whose `wrapLooseInline` wraps loose inline content at the document root. */
   readonly kit?: KitRuntime | undefined;
+  /** Turns ref names and keys into element ids (default: `slugify`). */
   readonly slugify?: ((text: string) => string) | undefined;
   /** Per-type derive functions; override the definitions' own `derive`. */
   readonly derive?: Readonly<Record<string, DeriveFn>> | undefined;
@@ -82,6 +102,7 @@ export interface CompileOptions {
   readonly hooks?: readonly Hook[] | undefined;
   /** Counter names per node type: `{ theorem: 'theorem', lemma: 'theorem' }` → `meta.number`. */
   readonly numbering?: Readonly<Record<string, string>> | undefined;
+  /** Opaque integrator context (`ctx.context` in hooks and derive functions). */
   readonly context?: unknown;
   /**
    * Resolve references from derive functions (`ctx.resolve(ref)`), e.g. `index.resolver()` of a {@link CorpusIndex}
@@ -89,7 +110,9 @@ export interface CompileOptions {
    * with `deriveJSON`, when the whole corpus is known.
    */
   readonly resolve?: ResolveFn | undefined;
+  /** Derive functions running at once (default 8). */
   readonly concurrency?: number | undefined;
+  /** Stops starting new derive tasks once aborted. */
   readonly signal?: AbortSignal | undefined;
   /** Throw a TSProseError when any error-level diagnostic exists. */
   readonly strict?: boolean | undefined;
@@ -100,14 +123,15 @@ export interface OutgoingRef {
   readonly node: BaseNode;
   /** Prop (or meta/data key) holding the reference; `'of'` for transclusions. */
   readonly prop: string;
+  /** The reference as written: a handle, or the serialized form of an address / addressable. */
   readonly ref: Ref | RefTarget;
-  /** Where it points; undefined when a handle's document is not known (reported as `ref/unresolved`). */
+  /** Where it points; undefined when unresolvable (reported as `ref/unresolved`). */
   readonly target: Address | undefined;
   /** Relation kind from the prop's `refSchema({ kind })`: `'link'` by default, `'include'` for transclusions. */
   readonly kind: string;
   /** Tag name the prop's schema expects the target to be (`refSchema(Theorem)`). */
   readonly expects?: string | undefined;
-  /** Element ids of the referencing node and its ancestors, outermost first ("references inside this solution"). */
+  /** Element ids of the referencing node and its ancestors, outermost first ("references inside this section"). */
   readonly within: readonly string[];
   /** Human readable ancestry of the referencing node. */
   readonly path: readonly string[];
@@ -121,7 +145,7 @@ export interface CompileResult {
   readonly refs: ReadonlyMap<string, BaseNode>;
   /** Element id → node. */
   readonly ids: ReadonlyMap<string, BaseNode>;
-  /** Content hashes by node. */
+  /** Content hashes by node (see `contentHash`). */
   readonly hashes: ReadonlyMap<BaseNode, string>;
   /** Derive key → value. */
   readonly derived: ReadonlyMap<string, unknown>;
@@ -133,8 +157,8 @@ export interface CompileResult {
 
 interface Session {
   readonly options: CompileOptions;
+  /** Results of documents compiled with the session options, by document id. */
   readonly results: Map<string, Promise<CompileResult>>;
-  readonly inProgress: Set<string>;
 }
 
 //
@@ -148,9 +172,13 @@ function toInput(input: CompileInput): Document | BaseNode {
   return Array.isArray(input) ? makeFragment(input) : (input as Document | BaseNode);
 }
 
+/**
+ * Compile a document (or nodes): normalize the root → resolve `<Include>`s → collect diagnostics → ids and content
+ * hashes → refs and outgoing references → numbering and hooks → derive. Never throws unless `strict`.
+ */
 export async function compile(input: CompileInput, options: CompileOptions = {}): Promise<CompileResult> {
-  const session: Session = { options, results: new Map(), inProgress: new Set() };
-  return compileInSession(toInput(input), options, session);
+  const session: Session = { options, results: new Map() };
+  return compileInSession(toInput(input), options, session, []);
 }
 
 /**
@@ -160,14 +188,17 @@ export async function compile(input: CompileInput, options: CompileOptions = {})
  */
 export interface CompileSession {
   readonly options: CompileOptions;
-  /** Compile a document (cached by its corpus id when it has one) or a bare node. */
+  /**
+   * Compile a document or nodes. A corpus document compiled with the session options is cached by its id;
+   * `overrides` (or a bare node) bypass the cache — the result is fresh and not stored.
+   */
   compile(input: CompileInput, overrides?: Partial<CompileOptions>): Promise<CompileResult>;
   /** Results compiled so far, by document id. */
   readonly results: ReadonlyMap<string, Promise<CompileResult>>;
 }
 
 export function createCompileSession(options: CompileOptions = {}): CompileSession {
-  const session: Session = { options, results: new Map(), inProgress: new Set() };
+  const session: Session = { options, results: new Map() };
   return {
     options,
     results: session.results,
@@ -177,14 +208,17 @@ export function createCompileSession(options: CompileOptions = {}): CompileSessi
       const doc = isDocument(input) ? input : undefined;
       const id = merged.documentId ?? doc?.scope.documentId;
       if (doc && id && merged.corpus?.get(id) === doc && !overrides) {
-        return compileDocumentInSession(id, doc, session);
+        return compileDocumentInSession(id, doc, session, []);
       }
-      return compileInSession(input, merged, session);
+      return compileInSession(input, merged, session, []);
     },
   };
 }
 
-/** Compile every document of a corpus sharing one session (includes resolve across documents). */
+/**
+ * Compile every document of a corpus sharing one session (includes resolve across documents) and index the
+ * results; the index's validation (broken references) is part of `diagnostics`.
+ */
 export async function compileCorpus(
   corpus: Corpus,
   options: Omit<CompileOptions, 'corpus' | 'documentId'> & {
@@ -193,60 +227,62 @@ export async function compileCorpus(
   } = {},
 ): Promise<{
   results: Map<string, CompileResult>;
-  backRefs: Map<string, OutgoingRef[]>;
-  /** Addressable elements and references of the whole corpus; its validation diagnostics are in `diagnostics`. */
+  /** Addressable elements and references of the whole corpus (`index.incoming(…)` for back references). */
   index: CorpusIndex;
   diagnostics: Diagnostic[];
 }> {
   const full: CompileOptions = { ...options, corpus };
-  const session: Session = { options: full, results: new Map(), inProgress: new Set() };
+  const session: Session = { options: full, results: new Map() };
   const results = new Map<string, CompileResult>();
   for (const [id, doc] of corpus.entries()) {
-    results.set(id, await compileDocumentInSession(id, doc, session));
+    results.set(id, await compileDocumentInSession(id, doc, session, []));
   }
-  const backRefs = new Map<string, OutgoingRef[]>();
   const diagnostics: Diagnostic[] = [];
   const index = new CorpusIndex(options.index);
   for (const result of results.values()) {
     diagnostics.push(...result.diagnostics);
     index.update(result);
-    for (const out of result.outgoing) {
-      if (!out.target) continue;
-      const key = out.target.name === undefined ? out.target.documentId : `${out.target.documentId}#${out.target.name}`;
-      const list = backRefs.get(key);
-      if (list) list.push(out);
-      else backRefs.set(key, [out]);
-    }
   }
   diagnostics.push(...index.validate());
   if (full.strict && hasErrors(diagnostics)) {
     throw new TSProseError('Corpus compilation failed', diagnostics);
   }
-  return { results, backRefs, index, diagnostics };
+  return { results, index, diagnostics };
 }
 
-function compileDocumentInSession(id: string, doc: Document, session: Session): Promise<CompileResult> {
+/** Cached compile of a corpus document with the session options. Failed compilations are not cached. */
+function compileDocumentInSession(id: string, doc: Document, session: Session, chain: readonly string[]): Promise<CompileResult> {
   const existing = session.results.get(id);
   if (existing) return existing;
-  const promise = compileInSession(doc, { ...session.options, documentId: id }, session);
+  const promise = compileInSession(doc, { ...session.options, documentId: id }, session, chain);
   session.results.set(id, promise);
+  promise.catch(() => {
+    if (session.results.get(id) === promise) session.results.delete(id);
+  });
   return promise;
 }
 
-async function compileInSession(input: Document | BaseNode, options: CompileOptions, session: Session): Promise<CompileResult> {
+/**
+ * @param chain Documents currently including this one (outermost first): an include of any of them is a cycle.
+ * Kept per include chain, so concurrent compiles in one session never see each other as cycles.
+ */
+async function compileInSession(
+  input: Document | BaseNode,
+  options: CompileOptions,
+  session: Session,
+  chain: readonly string[],
+): Promise<CompileResult> {
   const doc = isDocument(input) ? input : undefined;
-  const documentId = options.documentId ?? doc?.scope.documentId;
+  const documentId = ownDocumentId(doc, options);
   const bag = new DiagnosticBag();
   const slug = options.slugify ?? defaultSlugify;
-
-  if (documentId) session.inProgress.add(documentId);
 
   // 1. evaluate + normalize root
   const root = evaluateDocument(input);
   normalizeRoot(root, options.kit, bag);
 
   // 2. include (transclusion) — before ids so copies get fresh ids
-  await resolveIncludes(root, doc, options, session, bag);
+  await resolveIncludes(root, doc, documentId, options, session, documentId ? [...chain, documentId] : chain, bag);
 
   // 3. collect node diagnostics with paths
   collectNodeDiagnostics(root, bag);
@@ -268,13 +304,21 @@ async function compileInSession(input: Document | BaseNode, options: CompileOpti
   // 7. derive
   const derived = await runDerive(root, hashes, options, bag);
 
-  if (documentId) session.inProgress.delete(documentId);
-
   const diagnostics = bag.items;
   if (options.strict && hasErrors(diagnostics)) {
     throw new TSProseError(`Compilation of ${documentId ?? 'document'} failed`, diagnostics);
   }
   return { documentId, root, diagnostics, refs, ids, hashes, derived, outgoing, counters, hooks: hookResults };
+}
+
+/** The compiled document's id: the explicit option wins over the document's own (corpus-bound) id. */
+function ownDocumentId(doc: Document | undefined, options: CompileOptions): string | undefined {
+  return options.documentId ?? doc?.scope.documentId;
+}
+
+/** Ref scopes owned by a document: its own scope and the scopes of its refs objects. */
+function ownScopes(doc: Document | undefined): Set<RefScope> {
+  return new Set(doc ? [doc.scope, ...doc.refs.map((r) => r[REFS])] : []);
 }
 
 //
@@ -324,11 +368,6 @@ function collectNodeDiagnostics(root: BaseNode, bag: DiagnosticBag): void {
   });
 }
 
-function nodeHash(node: AnyNode, children: readonly string[]): string {
-  if (isTextNode(node)) return hashText(`text:${node.text}`);
-  return hashText(canonicalJson({ t: node.type, p: node.props, d: node.data, c: children }));
-}
-
 function assignIds(
   root: BaseNode,
   hashes: Map<BaseNode, string>,
@@ -341,14 +380,14 @@ function assignIds(
     if (isTextNode(node)) {
       let h = textHashes.get(node);
       if (!h) {
-        h = nodeHash(node, []);
+        h = contentHash(node);
         textHashes.set(node, h);
       }
       return h;
     }
     let h = hashes.get(node);
     if (!h) {
-      h = nodeHash(node, (node.children ?? []).map(hashOf));
+      h = contentHash(node, (node.children ?? []).map(hashOf));
       hashes.set(node, h);
     }
     return h;
@@ -401,7 +440,7 @@ function assignIds(
         const key = keyFn(node);
         if (key) base = slug(key);
       } catch (error) {
-        bag.error('tag/key', `<${node.type}> key() threw: ${(error as Error)?.message ?? String(error)}`, node.pos, path);
+        bag.error('tag/key', `<${node.type}> key() threw: ${errorMessage(error)}`, node.pos, path);
       }
     }
     if (!base) base = `${node.type}-${hashes.get(node)!.slice(0, 10)}`;
@@ -411,41 +450,37 @@ function assignIds(
 
 function checkRefs(root: BaseNode, doc: Document | undefined, refs: Map<string, BaseNode>, bag: DiagnosticBag): void {
   const declared = new Map<string, Ref>();
-  const scopes = new Set<RefScope>();
-  if (doc) {
-    scopes.add(doc.scope);
-    for (const r of doc.refs) {
-      scopes.add(r[REFS]);
-      for (const handle of listRefs(r)) declared.set(handle.name, handle);
-    }
+  const scopes = ownScopes(doc);
+  for (const r of doc?.refs ?? []) {
+    for (const handle of listRefs(r)) declared.set(handle.name, handle);
   }
-  const used = new Map<string, BaseNode[]>();
+  const used = new Map<string, { node: BaseNode; path: string[] }[]>();
   walk(root, (node, ctx) => {
     if (isTextNode(node) || node.ref === undefined) return;
+    const path = [...ctx.path];
     const handle = getRefHandle(node);
     if (handle && doc && !scopes.has(handle.scope)) {
       bag.error(
         'ref/foreign',
         `Ref "${handle.name}" belongs to another document and cannot mark an element here; use <Include of> or a string "$"`,
         node.pos,
-        [...ctx.path],
+        path,
       );
     }
     const list = used.get(node.ref);
-    if (list) list.push(node);
-    else used.set(node.ref, [node]);
+    if (list) list.push({ node, path });
+    else used.set(node.ref, [{ node, path }]);
   });
-  for (const [name, nodes] of used) {
-    if (nodes.length > 1) {
-      for (const node of nodes.slice(1)) {
-        bag.error('ref/duplicate', `Ref "${name}" is used by ${nodes.length} elements`, node.pos);
-      }
+  for (const [name, uses] of used) {
+    for (const { node, path } of uses.slice(1)) {
+      bag.error('ref/duplicate', `Ref "${name}" is used by ${uses.length} elements`, node.pos, path);
     }
-    refs.set(name, nodes[0]!);
+    refs.set(name, uses[0]!.node);
   }
   for (const [name, handle] of declared) {
     if (!used.has(name)) {
-      bag.error('ref/unused', `Ref "${name}" (<${handle.def.name}>) is declared but never used in the document`);
+      const where = handle.scope.url ? ` (declared in ${handle.scope.url})` : '';
+      bag.error('ref/unused', `Ref "${name}" (<${handle.def.name}>) is declared but never used in the document${where}`);
     }
   }
 }
@@ -458,68 +493,65 @@ function collectOutgoing(
   bag: DiagnosticBag,
 ): OutgoingRef[] {
   const out: OutgoingRef[] = [];
-  const ownScopes = new Set<RefScope>(doc ? [doc.scope, ...doc.refs.map((r) => r[REFS])] : []);
-  const ownId = doc?.scope.documentId ?? documentId;
+  const scopes = ownScopes(doc);
   walk(root, (node, ctx) => {
     if (isTextNode(node)) return;
     const within = [...ctx.ancestors, node].map((n) => n.id).filter((id): id is string => id !== undefined);
     const path = [...ctx.path];
-    // Transcluded copy: its include reference is the outgoing reference (no diagnostics, the include phase reported).
-    const includeRef = (node as unknown as Record<symbol, Ref | RefTarget | undefined>)[INCLUDE_REF];
-    if (includeRef) {
+    const push = (prop: string, ref: Ref | RefTarget, target: Address | undefined, kind: string, expects?: string) =>
+      out.push({ node, prop, ref, target, kind, expects, within, path });
+
+    // Transcluded copy: its include reference is an outgoing reference (the include phase reported problems);
+    // the copy's own props are scanned below like any node's.
+    const included = (node as unknown as Record<symbol, Ref | RefTarget | undefined>)[INCLUDE_REF];
+    if (included) {
       const from = node.meta.includedFrom as { documentId: string; name: string };
-      out.push({ node, prop: 'of', ref: includeRef, target: { documentId: from.documentId, name: from.name }, kind: 'include', within, path });
-      return;
+      push('of', included, { documentId: from.documentId, name: from.name }, 'include');
     }
     if (node.type === Include.def.name) {
-      const raw = node.props.of;
-      const ref = isAddressable(raw) && !isRef(raw) && !isRefTarget(raw) ? toRefTarget(raw) : raw;
-      if (isRef(ref) || isRefTarget(ref)) out.push({ node, prop: 'of', ref, target: undefined, kind: 'include', within, path });
+      // An unresolved <Include> (resolved ones were replaced by their copies).
+      const value = node.props.of;
+      if (isReferenceValue(value)) push('of', isRef(value) ? value : toRefTarget(value), undefined, 'include');
       return;
     }
+
     const kinds = refPropsOfProps(getDef(node)?.props);
-    const visitValue = (prop: string, raw: unknown, depth: number, top: boolean) => {
-      const value = !isRef(raw) && !isRefTarget(raw) && isAddressable(raw) ? toRefTarget(raw) : raw;
-      if (isRef(value)) {
-        const own = ownScopes.has(value.scope);
-        const targetDoc = own ? ownId : corpus ? corpus.resolve(value)?.documentId : value.scope.documentId;
-        const target = targetDoc ? { documentId: targetDoc, name: value.name } : undefined;
-        if (!target) {
-          const where = value.scope.url ? ` (${value.scope.url})` : '';
-          if (corpus || own) {
-            bag.error('ref/unresolved', `Ref "${value.name}"${where} points to a document that is not in the corpus`, node.pos, path);
-          } else {
-            bag.warning('ref/unresolved', `Ref "${value.name}"${where} cannot be resolved without a corpus`, node.pos, path);
+    forEachReference(node, (prop, value, inProps) => {
+        const meta = inProps ? kinds[prop] : undefined;
+        let target: Address | undefined;
+        if (isRef(value)) {
+          const own = scopes.has(value.scope);
+          const targetDoc = own ? documentId : corpus ? corpus.resolve(value)?.documentId : value.scope.documentId;
+          target = targetDoc ? { documentId: targetDoc, name: value.name } : undefined;
+          if (!target) {
+            const where = value.scope.url ? ` (${value.scope.url})` : '';
+            if (own) {
+              bag.error('ref/unresolved', `Ref "${value.name}" belongs to this document, which has no id (compile it with a documentId or in a corpus)`, node.pos, path);
+            } else if (corpus) {
+              bag.error('ref/unresolved', `Ref "${value.name}"${where} points to a document that is not in the corpus`, node.pos, path);
+            } else {
+              bag.warning('ref/unresolved', `Ref "${value.name}"${where} cannot be resolved without a corpus`, node.pos, path);
+            }
           }
+        } else {
+          target = addressOf(value);
+          if (!target) bag.error('ref/unresolved', `Reference "${referenceLabel(value)}" has no address`, node.pos, path);
         }
-        const meta = top ? kinds[prop] : undefined;
-        out.push({ node, prop, ref: value, target, kind: meta?.kind ?? 'link', expects: meta?.tag, within, path });
-        return;
-      }
-      if (isRefTarget(value)) {
-        const { documentId: id, name, params } = value.$ref;
-        const target = id
-          ? { documentId: id, ...(name !== undefined ? { name } : {}), ...(params !== undefined ? { params } : {}) }
-          : undefined;
-        if (!target) bag.error('ref/unresolved', `Reference "${name ?? '?'}" has no document id`, node.pos, path);
-        const meta = top ? kinds[prop] : undefined;
-        out.push({ node, prop, ref: value, target, kind: meta?.kind ?? 'link', expects: meta?.tag, within, path });
-        return;
-      }
-      if (depth > 2 || value === null || typeof value !== 'object' || isAnyNode(value)) return;
-      if (Array.isArray(value)) value.forEach((v) => visitValue(prop, v, depth + 1, top));
-      else for (const v of Object.values(value as Record<string, unknown>)) visitValue(prop, v, depth + 1, top);
-    };
-    for (const [prop, value] of Object.entries(node.props)) visitValue(prop, value, 0, true);
-    for (const [prop, value] of Object.entries(node.meta)) visitValue(prop, value, 0, false);
-    if (node.data !== null && typeof node.data === 'object' && !Array.isArray(node.data) && !isAnyNode(node.data)) {
-      for (const [key, value] of Object.entries(node.data as Record<string, unknown>)) visitValue(key, value, 0, false);
-    }
+        push(prop, isRef(value) ? value : toRefTarget(value), target, meta?.kind ?? 'link', meta?.tag);
+    });
   });
   return out;
 }
 
-async function resolveIncludes(root: BaseNode, doc: Document | undefined, options: CompileOptions, session: Session, bag: DiagnosticBag): Promise<void> {
+async function resolveIncludes(
+  root: BaseNode,
+  doc: Document | undefined,
+  documentId: string | undefined,
+  options: CompileOptions,
+  session: Session,
+  chain: readonly string[],
+  bag: DiagnosticBag,
+): Promise<void> {
   const includes: { node: BaseNode; parent: BaseNode; index: number; path: string[] }[] = [];
   walk(root, (node, ctx) => {
     if (!isTextNode(node) && node.type === Include.def.name && ctx.parent) {
@@ -528,76 +560,79 @@ async function resolveIncludes(root: BaseNode, doc: Document | undefined, option
   });
   if (!includes.length) return;
 
-  const kit = options.kit;
+  const corpus = options.corpus;
+  const scopes = ownScopes(doc);
   for (const { node, parent, index, path } of includes) {
-    const raw = node.props.of;
-    const ref = !isRef(raw) && !isRefTarget(raw) && isAddressable(raw) ? toRefTarget(raw) : raw;
-    if (!isRef(ref) && !isRefTarget(ref)) continue; // already reported by props validation
-    const corpus = options.corpus;
-    const label = isRef(ref) ? ref.name : (ref.$ref.name ?? ref.$ref.documentId ?? '?');
-    const own = isRef(ref)
-      ? doc && (doc.scope === ref.scope || doc.refs.some((r) => r[REFS] === ref.scope))
-      : ref.$ref.documentId !== undefined && ref.$ref.documentId === (doc?.scope.documentId ?? options.documentId);
-    let target: CompileResult | undefined;
+    const value = node.props.of;
+    if (!isReferenceValue(value)) continue; // reported by props validation
+    const label = referenceLabel(value);
+    const address = isRef(value) ? corpus?.resolve(value) : addressOf(value);
+    const own = isRef(value) ? scopes.has(value.scope) : !!address && address.documentId === documentId;
     if (own) {
       bag.error('include/self', `<Include> cannot include an element of its own document ("${label}")`, node.pos, path);
       continue;
     }
-    if (!isRef(ref) && ref.$ref.name === undefined) {
+    if (!isRef(value) && !address) {
+      bag.error('ref/unresolved', `<Include of="${label}"> has no address`, node.pos, path);
+      continue;
+    }
+    if (address && address.name === undefined) {
       bag.error('include/whole-document', `<Include of="${label}"> must point to an element, not a whole document`, node.pos, path);
       continue;
     }
-    const resolved = isRef(ref)
-      ? corpus?.resolve(ref)
-      : ref.$ref.documentId && corpus?.has(ref.$ref.documentId)
-        ? { documentId: ref.$ref.documentId, name: ref.$ref.name! }
-        : undefined;
-    if (!resolved || !corpus) {
+    const targetDoc = address ? corpus?.get(address.documentId) : undefined;
+    if (!address || !targetDoc) {
       bag.error('include/unresolved', `<Include of="${label}"> points to a document that is not in the corpus`, node.pos, path);
       continue;
     }
-    if (session.inProgress.has(resolved.documentId)) {
-      bag.error('include/cycle', `<Include of="${label}"> creates an include cycle with document "${resolved.documentId}"`, node.pos, path);
+    const name = address.name!;
+    if (chain.includes(address.documentId)) {
+      bag.error('include/cycle', `<Include of="${label}"> creates an include cycle with document "${address.documentId}"`, node.pos, path);
       continue;
     }
-    const targetDoc = corpus.get(resolved.documentId)!;
-    target = await compileDocumentInSession(resolved.documentId, targetDoc, session);
-    const source = target.refs.get(resolved.name);
+    let target: CompileResult;
+    try {
+      target = await compileDocumentInSession(address.documentId, targetDoc, session, chain);
+    } catch (error) {
+      bag.error('include/failed', `<Include of="${label}">: document "${address.documentId}" failed to compile: ${errorMessage(error)}`, node.pos, path);
+      continue;
+    }
+    const source = target.refs.get(name);
     if (!source) {
-      bag.error('include/missing', `Document "${resolved.documentId}" has no element with ref "${resolved.name}"`, node.pos, path);
+      bag.error('include/missing', `Document "${address.documentId}" has no element with ref "${name}"`, node.pos, path);
       continue;
     }
     const copy = cloneNode(source);
+    copyHidden(source, copy);
     walk(copy, (n) => {
       if (isTextNode(n)) return;
       n.id = undefined;
       n.ref = undefined;
       n.derived = undefined;
       n.diagnostics = undefined;
-      kit?.onInclude?.(n);
-      const def = getDef(n);
-      if (def) Object.defineProperty(n, Symbol.for('tsprose.def'), { value: def, enumerable: false, configurable: true });
+      (getKit(n) ?? options.kit)?.onInclude?.(n);
     });
-    copyDefs(source, copy);
-    Object.defineProperty(copy, REF_HANDLE, { value: undefined, enumerable: false, configurable: true });
     const extraMeta = (node.props.meta as Record<string, unknown> | undefined) ?? {};
-    copy.meta = { ...copy.meta, ...extraMeta, includedFrom: { documentId: resolved.documentId, name: resolved.name } };
-    Object.defineProperty(copy, INCLUDE_REF, { value: ref, enumerable: false, configurable: true });
+    copy.meta = { ...copy.meta, ...extraMeta, includedFrom: { documentId: address.documentId, name } };
+    Object.defineProperty(copy, INCLUDE_REF, { value: isRef(value) ? value : toRefTarget(value), enumerable: false, configurable: true });
     if (node.pos) copy.pos = node.pos;
     parent.children![index] = copy;
   }
 }
 
-/** cloneNode drops symbol-keyed definitions; restore them by walking both trees in lockstep. */
-function copyDefs(from: AnyNode, to: AnyNode): void {
+/**
+ * `cloneNode` copies enumerable data only; restore definitions, kits and include markers (nested transclusions)
+ * by walking both trees in lockstep.
+ */
+function copyHidden(from: AnyNode, to: AnyNode): void {
   if (isTextNode(from) || isTextNode(to)) return;
   const def = getDef(from);
-  if (def) Object.defineProperty(to, Symbol.for('tsprose.def'), { value: def, enumerable: false, configurable: true });
-  const kit = getKit(from);
-  if (kit) Object.defineProperty(to, Symbol.for('tsprose.kit'), { value: kit, enumerable: false, configurable: true });
+  if (def) attachDef(to, def, getKit(from));
+  const included = (from as unknown as Record<symbol, unknown>)[INCLUDE_REF];
+  if (included) Object.defineProperty(to, INCLUDE_REF, { value: included, enumerable: false, configurable: true });
   const a = from.children ?? [];
   const b = to.children ?? [];
-  for (let i = 0; i < a.length; i++) copyDefs(a[i]!, b[i]!);
+  for (let i = 0; i < a.length; i++) copyHidden(a[i]!, b[i]!);
 }
 
 function applyNumbering(root: BaseNode, numbering: Readonly<Record<string, string>> | undefined): Map<string, number> {
@@ -624,6 +659,7 @@ async function runHooks(
   const results = new Map<string, unknown>();
   const hooks = options.hooks ?? [];
   if (!hooks.length) return results;
+  const paths = new WeakMap<AnyNode, readonly string[]>();
   const ctx: HookContext = {
     documentId,
     root,
@@ -632,12 +668,14 @@ async function runHooks(
     context: options.context,
     report(code, message, node, severity = 'error') {
       const pos = node && !isTextNode(node) ? node.pos : undefined;
-      if (severity === 'error') bag.error(code, message, pos);
-      else bag.warning(code, message, pos);
+      const path = node ? paths.get(node) : undefined;
+      if (severity === 'error') bag.error(code, message, pos, path);
+      else bag.warning(code, message, pos, path);
     },
   };
   walk(root, {
     enter(node, w) {
+      paths.set(node, [...w.path]);
       for (const h of hooks) h.enter?.(node, w, ctx);
     },
     leave(node, w) {
@@ -649,7 +687,7 @@ async function runHooks(
       try {
         results.set(h.name, await h.finish(ctx));
       } catch (error) {
-        bag.error('hook/failed', `Hook "${h.name}" failed: ${(error as Error)?.message ?? String(error)}`);
+        bag.error('hook/failed', `Hook "${h.name}" failed: ${errorMessage(error)}`);
       }
     }
   }
@@ -666,8 +704,8 @@ async function runDerive(root: BaseNode, hashes: ReadonlyMap<BaseNode, string>, 
     const def = getDef(node);
     const fn = override ?? (def?.derive as DeriveFn | undefined);
     if (!fn || hasInvalidProps(node)) return;
-    // Nodes outside the tree (in data, deriveExtra) have no tree hash: key them by their full content.
-    const key = `${node.type}:${hashes.get(node) ?? hashText(canonicalJson(nodeToJSON(node)))}`;
+    // Nodes outside the tree (in data, deriveExtra) have no tree hash: their content hash is computed.
+    const key = deriveKey(node, hashes.get(node));
     node.derived = key;
     if (seen.has(key)) return;
     seen.add(key);
@@ -693,24 +731,22 @@ async function runDerive(root: BaseNode, hashes: ReadonlyMap<BaseNode, string>, 
       }
     });
   }
-  if (!tasks.length) return derived;
 
-  const limit = Math.max(1, options.concurrency ?? 8);
-  let next = 0;
   const ctx: DeriveContext = { context: options.context, signal: options.signal, resolve: options.resolve };
-  const worker = async () => {
-    while (next < tasks.length) {
-      const task = tasks[next++]!;
+  await runPool(
+    tasks,
+    options.concurrency,
+    async (task) => {
       try {
         const value = await task.fn(task.node, ctx);
         derived.set(task.key, value === undefined ? null : value);
       } catch (error) {
-        bag.error('derive/failed', `<${task.node.type}> derive failed: ${(error as Error)?.message ?? String(error)}`, task.node.pos, task.path);
+        bag.error('derive/failed', `<${task.node.type}> derive failed: ${errorMessage(error)}`, task.node.pos, task.path);
         derived.set(task.key, null);
       }
-    }
-  };
-  await Promise.all(Array.from({ length: Math.min(limit, tasks.length) }, worker));
+    },
+    options.signal,
+  );
   return derived;
 }
 
@@ -718,10 +754,3 @@ async function runDerive(root: BaseNode, hashes: ReadonlyMap<BaseNode, string>, 
 function hasInvalidProps(node: BaseNode): boolean {
   return !!node.diagnostics?.some((d) => d.code === 'props/invalid');
 }
-
-/** Format the ancestry label of a node (utility for integrators' own diagnostics). */
-export function describePath(ancestors: readonly BaseNode[], node: AnyNode): string {
-  return [...ancestors.map((a, i) => labelOf(a, i, ancestors[i - 1])), labelOf(node, ancestors.length, ancestors.at(-1))].join(' > ');
-}
-
-export { walkAsync };

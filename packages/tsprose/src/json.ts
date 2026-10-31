@@ -5,28 +5,62 @@ import type { Prose } from './registry.js';
 import type { AnyTag } from './tag.js';
 import { validateProps } from './standard.js';
 import { DiagnosticBag, type Diagnostic } from './diagnostics.js';
-import { isAddressable, isRef, toRefTarget, type RefTarget } from './ref.js';
+import { isReferenceValue, toRefTarget } from './ref.js';
+import { canonicalJson, hashText } from './hash.js';
 
 /** A node stored inside `data`/`props`, serialized compactly: `{ $node: <JsonNode> }`. */
 export interface JsonNodeSlot {
   readonly $node: JsonNode;
 }
 
-function isJsonNodeSlot(value: unknown): value is JsonNodeSlot {
+export function isJsonNodeSlot(value: unknown): value is JsonNodeSlot {
   return typeof value === 'object' && value !== null && !Array.isArray(value) && '$node' in value && Object.keys(value).length === 1;
 }
 
-function sanitize(value: unknown): unknown {
-  if (isRef(value)) return { $ref: { documentId: value.scope.documentId, name: value.name } } satisfies RefTarget;
-  if (isAddressable(value)) return toRefTarget(value);
-  if (isAnyNode(value)) return { $node: nodeToJSON(value) } satisfies JsonNodeSlot;
-  if (Array.isArray(value)) return value.map(sanitize);
+/**
+ * JSON form of a prop/data/meta value: references become `{ $ref }`, nodes become `{ $node }` (or, for content
+ * hashing, their content without ids), `undefined` members are dropped.
+ */
+function jsonValue(value: unknown, node: (node: AnyNode) => unknown): unknown {
+  if (isReferenceValue(value)) return toRefTarget(value);
+  if (isAnyNode(value)) return { $node: node(value) };
+  if (Array.isArray(value)) return value.map((v) => jsonValue(v, node));
   if (value && typeof value === 'object') {
     const out: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(value as Record<string, unknown>)) if (v !== undefined) out[k] = sanitize(v);
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) if (v !== undefined) out[k] = jsonValue(v, node);
     return out;
   }
   return value;
+}
+
+function sanitize(value: unknown): unknown {
+  return jsonValue(value, nodeToJSON);
+}
+
+//
+// Content hashes (ids of unnamed elements, derive keys)
+//
+
+/**
+ * Content hash of a node: type, props and data (references and nested nodes in their JSON form) and the hashes of
+ * its children — never ids, refs, meta or positions. Compiled nodes and nodes restored with `fromJSON` hash alike.
+ */
+export function contentHash(node: AnyNode, childHashes?: readonly string[]): string {
+  if (isTextNode(node)) return hashText(`text:${node.text}`);
+  const content = (n: AnyNode): unknown => (isTextNode(n) ? n.text : { t: n.type, h: contentHash(n) });
+  return hashText(
+    canonicalJson({
+      t: node.type,
+      p: jsonValue(node.props, content),
+      d: jsonValue(node.data, content),
+      c: childHashes ?? (node.children ?? []).map((c) => contentHash(c)),
+    }),
+  );
+}
+
+/** Derive key of a node: `type:contentHash`. Shared by `compile` and `deriveJSON`, so their caches agree. */
+export function deriveKey(node: BaseNode, hash: string = contentHash(node)): string {
+  return `${node.type}:${hash}`;
 }
 
 export type JsonNode =

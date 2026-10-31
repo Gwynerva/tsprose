@@ -1,6 +1,7 @@
 import { isBaseNode, isTextNode, type AnyNode, type BaseNode } from './node.js';
 import type { NodeOf } from './node.js';
-import { isAddressable, isRef } from './ref.js';
+import { isAddressable, isRef, isReferenceValue, type ReferenceValue } from './ref.js';
+import { isPlainObject } from './util.js';
 import type { AnyTag } from './tag.js';
 
 export interface WalkContext {
@@ -197,4 +198,23 @@ export function nodesInData(value: unknown, out: BaseNode[] = [], seen: Set<unkn
   if (proto !== Object.prototype && proto !== null) return out;
   for (const item of Object.values(value as Record<string, unknown>)) nodesInData(item, out, seen);
   return out;
+}
+
+/**
+ * Reference values held by a node: in its props (`inProps`), meta (except `includedFrom`) and data, inside plain
+ * objects and arrays up to three levels deep. Nodes stored in props/data are not entered (they are nodes of their own).
+ */
+export function forEachReference(
+  node: BaseNode,
+  fn: (key: string, value: ReferenceValue, inProps: boolean) => void,
+): void {
+  const visit = (key: string, value: unknown, depth: number, inProps: boolean) => {
+    if (isReferenceValue(value)) return fn(key, value, inProps);
+    if (depth > 2 || isBaseNode(value)) return;
+    if (Array.isArray(value)) value.forEach((v) => visit(key, v, depth + 1, inProps));
+    else if (isPlainObject(value)) for (const v of Object.values(value)) visit(key, v, depth + 1, inProps);
+  };
+  for (const [key, value] of Object.entries(node.props)) visit(key, value, 0, true);
+  for (const [key, value] of Object.entries(node.meta)) if (key !== 'includedFrom') visit(key, value, 0, false);
+  if (isPlainObject(node.data)) for (const [key, value] of Object.entries(node.data)) visit(key, value, 0, false);
 }

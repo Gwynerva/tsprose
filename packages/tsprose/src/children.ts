@@ -11,6 +11,7 @@ import {
   type BaseNode,
   type TextNode,
 } from './node.js';
+import { errorMessage } from './util.js';
 
 /**
  * Paragraph separator (U+2029). Loose inline content inside a block-only container is split into
@@ -183,7 +184,7 @@ export function buildChildren(args: BuildChildrenArgs): AnyNode[] | undefined {
       });
       nodes = rewritten === nodes ? nodes : flattenChildren(rewritten, bag, pos);
     } catch (error) {
-      bag.error('tag/normalize', `${tagName} normalize() threw: ${(error as Error)?.message ?? String(error)}`, pos);
+      bag.error('tag/normalize', `${tagName} normalize() threw: ${errorMessage(error)}`, pos);
     }
   }
 

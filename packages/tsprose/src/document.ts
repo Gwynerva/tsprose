@@ -3,6 +3,7 @@ import { makeFragment } from './element.js';
 import { DiagnosticBag } from './diagnostics.js';
 import { isAnyNode, type BaseNode } from './node.js';
 import { REFS, type RefScope, type Refs, type RefsTemplate } from './ref.js';
+import { errorMessage } from './util.js';
 
 export const DOCUMENT: unique symbol = Symbol.for('tsprose.document');
 
@@ -30,27 +31,24 @@ export interface Document {
   readonly refs: readonly Refs<RefsTemplate>[];
   readonly scope: RefScope;
   readonly meta: Readonly<Record<string, unknown>>;
+  /** The document's own id (`defineDocument({ id })`), when it does not get one from the integrator. */
+  readonly id?: string | undefined;
 }
 
 export function defineDocument(content: () => ComponentResult, options: DocumentOptions = {}): Document {
   const refs = options.refs === undefined ? [] : Array.isArray(options.refs) ? [...options.refs] : [options.refs as Refs<RefsTemplate>];
   const first = refs[0];
   const scope: RefScope = first ? first[REFS] : { url: options.url, documentId: undefined };
+  // Several refs objects must agree on the document.
+  const ids = new Set([scope, ...refs.map((r) => r[REFS])].map((s) => s.documentId).filter((id) => id !== undefined));
+  if (options.id !== undefined) ids.add(options.id);
+  if (ids.size > 1) {
+    throw new TypeError(`defineDocument: refs objects / id belong to different documents (${[...ids].join(', ')})`);
+  }
   if (options.id !== undefined) {
-    if (scope.documentId && scope.documentId !== options.id) {
-      throw new TypeError(`defineDocument: id "${options.id}" conflicts with the refs' document "${scope.documentId}"`);
-    }
-    scope.documentId = options.id;
+    for (const s of [scope, ...refs.map((r) => r[REFS])]) s.documentId = options.id;
   }
-  for (const r of refs) {
-    if (r[REFS] !== scope) {
-      // Several refs objects: they must agree on the document. Bind them to the first scope.
-      if (r[REFS].documentId && scope.documentId && r[REFS].documentId !== scope.documentId) {
-        throw new TypeError('defineDocument: refs objects belong to different documents');
-      }
-    }
-  }
-  return { [DOCUMENT]: true, content, refs, scope, meta: options.meta ?? {} };
+  return { [DOCUMENT]: true, content, refs, scope, meta: options.meta ?? {}, ...(options.id !== undefined ? { id: options.id } : {}) };
 }
 
 export function isDocument(value: unknown): value is Document {
@@ -66,7 +64,7 @@ export function evaluateDocument(doc: Document | BaseNode): BaseNode {
     return toRoot(doc.content());
   } catch (error) {
     const bag = new DiagnosticBag();
-    bag.error('document/threw', `Document content threw: ${(error as Error)?.message ?? String(error)}`);
+    bag.error('document/threw', `Document content threw: ${errorMessage(error)}`);
     const root = toRoot(undefined);
     root.diagnostics = bag.items;
     return root;

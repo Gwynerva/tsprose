@@ -206,11 +206,14 @@ describe('CorpusIndex', () => {
     expect(index.resolve(ref('section/limits', 'intro'))).toBeDefined();
     expect(index.resolve(ref('section/limits', 'other'))).toBeUndefined();
     expect(index.incoming('dem/2').map((e) => e.from).sort()).toEqual(['dem/1', 'dem/3']);
-    expect(() => index.alias('dem/2', 'dem/999')).toThrow(/cycle/);
+    expect(() => index.alias('dem/2', 'dem/999')).toThrow(/is a document/);
+    index.alias('old/a', 'old/b');
+    expect(() => index.alias('old/b', 'old/a')).toThrow(/cycle/);
     index.remove('dem/2');
     expect(codes(index.validate(['dem/1']))).toEqual(['ref/missing-document']);
-    // Referrers survive removal: re-adding the document affects them.
-    expect([...index.affected(['dem/2']).keys()].sort()).toEqual(['dem/1', 'dem/3']);
+    // Referrers survive removal (re-adding the document affects them); aliases to it are dropped.
+    expect([...index.affected(['dem/2']).keys()].sort()).toEqual(['dem/1']);
+    expect(index.canonicalId('dem/999')).toBe('dem/999');
   });
 
   it('round-trips through JSON and indexes serialized prose', async () => {

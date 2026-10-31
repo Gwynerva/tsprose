@@ -1,5 +1,5 @@
 import type { Document } from './document.js';
-import { addressOf, isRef, type Address, type Ref, type ReferenceValue } from './ref.js';
+import { REFS, type Ref, type RefScope } from './ref.js';
 
 /**
  * A set of documents with stable ids. Adding a document binds its refs scope to the id,
@@ -18,7 +18,7 @@ export class Corpus {
   add(doc: Document): this;
   add(a: string | Document, b?: Document): this {
     const doc = typeof a === 'string' ? b! : a;
-    const documentId = typeof a === 'string' ? a : doc.scope.documentId;
+    const documentId = typeof a === 'string' ? a : (doc.id ?? doc.scope.documentId);
     if (!documentId) throw new TypeError('Corpus: document has no id (pass one to add() or to defineDocument({ id }))');
     const existing = this.docs.get(documentId);
     if (existing && existing !== doc) {
@@ -30,51 +30,67 @@ export class Corpus {
   /** Add or replace the document under an id (e.g. a re-imported module in a dev server). */
   set(documentId: string, doc: Document): this {
     const existing = this.docs.get(documentId);
-    if (existing && existing !== doc) this.remove(documentId);
+    if (existing === doc) return this;
+    this.checkBinding(documentId, doc, existing);
+    if (existing) this.remove(documentId);
     return this.bind(documentId, doc);
   }
 
-  /** Remove a document (e.g. its file was deleted). Returns whether it was present. */
+  /** Remove a document (e.g. its file was deleted) and unbind its refs. Returns whether it was present. */
   remove(documentId: string): boolean {
     const doc = this.docs.get(documentId);
     if (!doc) return false;
     this.docs.delete(documentId);
     if (doc.scope.url && this.byUrl.get(doc.scope.url) === documentId) this.byUrl.delete(doc.scope.url);
+    // Unbind, so the module can be added again under another id — unless the document owns its id.
+    if (doc.id === undefined) {
+      for (const scope of scopesOf(doc)) {
+        if (scope.documentId === documentId) scope.documentId = undefined;
+      }
+    }
     return true;
   }
 
-  private bind(documentId: string, doc: Document): this {
-    if (doc.scope.documentId && doc.scope.documentId !== documentId) {
+  /** Every scope of the document must be unbound or bound to this id (or to the document being replaced). */
+  private checkBinding(documentId: string, doc: Document, replacing?: Document): void {
+    for (const scope of scopesOf(doc)) {
+      if (scope.documentId === undefined || scope.documentId === documentId) continue;
+      if (replacing && scopesOf(replacing).includes(scope)) continue;
       throw new TypeError(
-        `Corpus: document "${documentId}" was already bound to id "${doc.scope.documentId}" (defineDocument({ id }) or a shared refs module?)`,
+        `Corpus: document "${documentId}" was already bound to id "${scope.documentId}" (defineDocument({ id }) or a shared refs module?)`,
       );
     }
-    doc.scope.documentId = documentId;
-    for (const refs of doc.refs) {
-      const scope = Object.getOwnPropertyDescriptor(refs, Symbol.for('tsprose.refs'))?.value as { documentId: string | undefined } | undefined;
-      if (scope) scope.documentId = documentId;
-    }
+  }
+
+  private bind(documentId: string, doc: Document): this {
+    this.checkBinding(documentId, doc);
+    for (const scope of scopesOf(doc)) scope.documentId = documentId;
     this.docs.set(documentId, doc);
     if (doc.scope.url) this.byUrl.set(doc.scope.url, documentId);
     return this;
   }
 
+  /** The document under an id. */
   get(documentId: string): Document | undefined {
     return this.docs.get(documentId);
   }
 
+  /** Whether a document is registered under the id. */
   has(documentId: string): boolean {
     return this.docs.has(documentId);
   }
 
+  /** Document id of a refs/document module URL. */
   idOfUrl(url: string): string | undefined {
     return this.byUrl.get(url);
   }
 
+  /** Ids of all documents, in insertion order. */
   ids(): string[] {
     return [...this.docs.keys()];
   }
 
+  /** `[id, document]` pairs, in insertion order. */
   entries(): [string, Document][] {
     return [...this.docs.entries()];
   }
@@ -84,13 +100,9 @@ export class Corpus {
     const documentId = ref.scope.documentId ?? (ref.scope.url ? this.byUrl.get(ref.scope.url) : undefined);
     return documentId && this.docs.has(documentId) ? { documentId, name: ref.name } : undefined;
   }
+}
 
-  /** Address of a handle or serialized reference, using this corpus to bind handles by module URL. */
-  addressOf(value: ReferenceValue): Address | undefined {
-    if (isRef(value)) {
-      const resolved = this.resolve(value);
-      return resolved ?? addressOf(value);
-    }
-    return addressOf(value);
-  }
+/** The document's own scope and the scopes of all its refs objects. */
+function scopesOf(doc: Document): RefScope[] {
+  return [...new Set([doc.scope, ...doc.refs.map((r) => r[REFS])])];
 }

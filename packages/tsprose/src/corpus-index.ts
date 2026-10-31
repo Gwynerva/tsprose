@@ -1,9 +1,10 @@
 import type { CompileResult } from './compile.js';
 import type { Diagnostic, Severity, SourcePos } from './diagnostics.js';
-import type { JsonNode, ProseJSON } from './json.js';
+import { nodeFromJSON, type ProseJSON } from './json.js';
 import { isTextNode, type BaseNode } from './node.js';
-import { addressKey, addressOf, isReferenceValue, isRefTarget, type Address, type ReferenceValue } from './ref.js';
-import { walk } from './walk.js';
+import { addressKey, addressOf, isReferenceValue, type Address, type ReferenceValue } from './ref.js';
+import { compareStrings } from './util.js';
+import { forEachReference, walk } from './walk.js';
 
 //
 // Types
@@ -131,6 +132,8 @@ export class CorpusIndex {
   /** target document id (as written) → referencing document ids. */
   private readonly referrers = new Map<string, Set<string>>();
   private readonly aliases = new Map<string, string>();
+  /** alias target → aliases pointing directly to it. */
+  private readonly aliasesTo = new Map<string, Set<string>>();
 
   constructor(options: CorpusIndexOptions = {}) {
     this.options = options;
@@ -144,64 +147,39 @@ export class CorpusIndex {
   update(result: CompileResult, meta?: Readonly<Record<string, unknown>>): this {
     const id = result.documentId;
     if (!id) throw new TypeError('CorpusIndex.update: the compile result has no document id');
-    return this.set(id, {
-      targets: collectTargets(result.root, this.options.name),
-      edges: result.outgoing.flatMap((o) =>
-        o.target
-          ? [
-              {
-                source: o.node.type,
-                prop: o.prop,
-                kind: o.kind,
-                target: o.target,
-                expects: o.expects,
-                within: o.within,
-                path: o.path,
-                pos: o.node.pos,
-              },
-            ]
-          : [],
-      ),
-      meta,
-    });
+    const edges: Omit<IndexedEdge, 'from'>[] = [];
+    for (const o of result.outgoing) {
+      if (!o.target) continue;
+      edges.push({ source: o.node.type, prop: o.prop, kind: o.kind, target: o.target, expects: o.expects, within: o.within, path: o.path, pos: o.node.pos });
+    }
+    return this.set(id, { targets: collectTargets(result.root, this.options.name), edges, meta });
   }
 
   /**
    * Index a document from its serialized JSON (systems that store prose, e.g. in a database, and never compile it
-   * in this process). Relation kinds are not part of JSON: references are `link`s, transcluded copies `include`s.
+   * in this process). Relation kinds and expected tags are not part of JSON: references are `link`s, transcluded
+   * copies `include`s. Otherwise the entry matches what {@link update} produces for the same document.
    */
   updateFromJSON(json: ProseJSON, meta?: Readonly<Record<string, unknown>>): this {
     const id = json.documentId;
     if (!id) throw new TypeError('CorpusIndex.updateFromJSON: the JSON has no document id');
-    const targets: IndexedTarget[] = [];
+    const root = nodeFromJSON(json.root) as BaseNode;
     const edges: Omit<IndexedEdge, 'from'>[] = [];
-    const visit = (node: JsonNode, path: string[], within: string[], index: number) => {
-      if (typeof node === 'string') return;
-      const label = node.r ? `${node.t}#${node.r}` : node.id ? `${node.t}#${node.id}` : path.length ? `${node.t}[${index}]` : node.t;
-      const here = [...path, label];
-      const inside = node.id ? [...within, node.id] : within;
-      if (node.r) targets.push({ name: node.r, type: node.t, id: node.id, path: here });
-      const from = node.m?.includedFrom as { documentId?: string; name?: string } | undefined;
+    walk(root, (node, ctx) => {
+      if (isTextNode(node)) return;
+      const within = [...ctx.ancestors, node].map((n) => n.id).filter((x): x is string => x !== undefined);
+      const path = [...ctx.path];
+      const from = node.meta.includedFrom as { documentId?: string; name?: string } | undefined;
       if (from?.documentId) {
-        edges.push({ source: node.t, prop: 'of', kind: 'include', target: { documentId: from.documentId, name: from.name }, within: inside, path: here });
+        const target: Address = from.name !== undefined ? { documentId: from.documentId, name: from.name } : { documentId: from.documentId };
+        edges.push({ source: node.type, prop: 'of', kind: 'include', target, within, path });
       }
-      const scan = (prop: string, value: unknown, depth: number) => {
-        if (isRefTarget(value)) {
-          const address = addressOf(value);
-          if (address) edges.push({ source: node.t, prop, kind: 'link', target: address, within: inside, path: here });
-          return;
-        }
-        if (depth > 2 || value === null || typeof value !== 'object' || '$node' in (value as object)) return;
-        for (const v of Array.isArray(value) ? value : Object.values(value as Record<string, unknown>)) scan(prop, v, depth + 1);
-      };
-      for (const [prop, value] of Object.entries(node.p ?? {})) scan(prop, value, 0);
-      if (node.d && typeof node.d === 'object' && !Array.isArray(node.d)) {
-        for (const [key, value] of Object.entries(node.d as Record<string, unknown>)) scan(key, value, 0);
-      }
-      node.c?.forEach((child, i) => visit(child, here, inside, i));
-    };
-    visit(json.root, [], [], 0);
-    return this.set(id, { targets, edges, meta });
+      forEachReference(node, (prop, value) => {
+        const target = addressOf(value);
+        if (target) edges.push({ source: node.type, prop, kind: 'link', target, within, path });
+      });
+    });
+    return this.set(id, { targets: collectTargets(root, this.options.name), edges, meta });
   }
 
   /** Set a document entry from any source. */
@@ -229,23 +207,38 @@ export class CorpusIndex {
     return this;
   }
 
-  /** Remove a document (deleted file, unpublished page). References to it become dangling. */
+  /**
+   * Remove a document (deleted file, unpublished page). References to it become dangling; aliases pointing to it
+   * are dropped. Referrers are remembered, so re-adding the document reports them in {@link affected}.
+   */
   remove(id: string): boolean {
     if (!this.docs.has(id)) return false;
     this.forgetEdges(id);
     this.docs.delete(id);
+    for (const alias of this.aliasesTo.get(id) ?? []) this.unalias(alias);
     return true;
   }
 
   /** Make an old id point to a new one (a moved document): references to `from` resolve to `to`. */
   alias(from: string, to: string): this {
     if (from === to) throw new TypeError(`CorpusIndex.alias: "${from}" cannot alias itself`);
-    this.aliases.set(from, to);
-    if (this.canonicalId(from) === from) {
-      this.aliases.delete(from);
-      throw new TypeError(`CorpusIndex.alias: alias cycle through "${from}"`);
+    if (this.docs.has(from)) throw new TypeError(`CorpusIndex.alias: "${from}" is a document, not an old id`);
+    for (let current: string | undefined = to; current !== undefined; current = this.aliases.get(current)) {
+      if (current === from) throw new TypeError(`CorpusIndex.alias: alias cycle through "${from}"`);
     }
+    this.unalias(from);
+    this.aliases.set(from, to);
+    let set = this.aliasesTo.get(to);
+    if (!set) this.aliasesTo.set(to, (set = new Set()));
+    set.add(from);
     return this;
+  }
+
+  private unalias(from: string): void {
+    const to = this.aliases.get(from);
+    if (to === undefined) return;
+    this.aliases.delete(from);
+    this.aliasesTo.get(to)?.delete(from);
   }
 
   private link(target: string, from: string): void {
@@ -264,15 +257,10 @@ export class CorpusIndex {
   // Queries
   //
 
-  /** Follow aliases (`from → to → …`). */
+  /** Follow aliases (`from → to → …`); `alias()` refuses cycles. */
   canonicalId(id: string): string {
     let current = id;
-    const seen = new Set<string>();
-    while (this.aliases.has(current)) {
-      if (seen.has(current)) return id;
-      seen.add(current);
-      current = this.aliases.get(current)!;
-    }
+    for (let next = this.aliases.get(current); next !== undefined; next = this.aliases.get(current)) current = next;
     return current;
   }
 
@@ -347,10 +335,13 @@ export class CorpusIndex {
     return out;
   }
 
+  /** Documents referencing `documentId` directly or through any alias chain ending at it. */
   private referrersOf(documentId: string): Set<string> {
-    const out = new Set(this.referrers.get(documentId) ?? []);
-    for (const [alias] of this.aliases) {
-      if (this.canonicalId(alias) === documentId) for (const id of this.referrers.get(alias) ?? []) out.add(id);
+    const out = new Set<string>();
+    const queue = [documentId];
+    for (let id = queue.pop(); id !== undefined; id = queue.pop()) {
+      for (const from of this.referrers.get(id) ?? []) out.add(from);
+      queue.push(...(this.aliasesTo.get(id) ?? []));
     }
     return out;
   }
@@ -441,7 +432,7 @@ export class CorpusIndex {
     return [...this.docs.values()]
       .filter((d) => !d.openNames)
       .map((d) => ({ id: d.id, names: Object.fromEntries([...d.targets.values()].map((t) => [t.name, t.type])) }))
-      .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+      .sort((a, b) => compareStrings(a.id, b.id));
   }
 
   toJSON(): CorpusIndexJSON {
@@ -469,7 +460,7 @@ export class CorpusIndex {
         index.set(d.id, { targets: d.targets, edges: d.edges, meta: d.meta });
       }
     }
-    for (const [from, to] of Object.entries(json.aliases ?? {})) index.aliases.set(from, to);
+    for (const [from, to] of Object.entries(json.aliases ?? {})) index.alias(from, to);
     return index;
   }
 }

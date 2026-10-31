@@ -72,7 +72,7 @@ export interface DeriveContext {
   /** Opaque integrator context passed to `compile({ context })`. */
   readonly context: unknown;
   readonly signal?: AbortSignal | undefined;
-  /** Resolve a reference against the corpus index, when the integrator provides one (`compile({ resolve })`, `deriveJSON({ index })`). */
+  /** Resolve a reference against the corpus index, when the integrator provides one (`compile({ resolve })`, `deriveJSON({ resolve })`). */
   readonly resolve?: ResolveFn | undefined;
 }
 

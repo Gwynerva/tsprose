@@ -1,6 +1,7 @@
 import type { Corpus } from './corpus.js';
 import type { RegistryEntry } from './corpus-index.js';
 import { listRefs } from './ref.js';
+import { compareStrings } from './util.js';
 
 export interface RegistryTypesOptions {
   /** Module augmented by the declaration (default `'tsprose'`). */
@@ -27,9 +28,9 @@ export function generateRegistryTypes(entries: Iterable<RegistryEntry>, options:
     `declare module ${JSON.stringify(module)} {`,
     `  interface ${name} {`,
   ];
-  const sorted = [...entries].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  const sorted = [...entries].sort((a, b) => compareStrings(a.id, b.id));
   for (const entry of sorted) {
-    const names = Object.entries(entry.names).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+    const names = Object.entries(entry.names).sort(([a], [b]) => compareStrings(a, b));
     if (!names.length) {
       lines.push(`    ${JSON.stringify(entry.id)}: {};`);
       continue;

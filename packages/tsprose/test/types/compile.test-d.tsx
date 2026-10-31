@@ -9,6 +9,7 @@ import {
   defineRefs,
   ref,
   type RefTarget,
+  type Addressable,
   select,
   toJSON,
   fromJSON,
@@ -42,7 +43,7 @@ describe('documents and refs', () => {
     // @ts-expect-error Include has no children
     <Include of={refs.thm}>x</Include>;
     <Include of={ref('other', 'thm')} />;
-    expectTypeOf<NodeOf<typeof Include>['props']['of']>().toEqualTypeOf<Ref | RefTarget>();
+    expectTypeOf<NodeOf<typeof Include>['props']['of']>().toEqualTypeOf<Ref | RefTarget | Addressable>();
   });
 });
 

@@ -159,11 +159,11 @@ describe('compile: corpus, links and includes', () => {
 
   it('compileCorpus compiles everything once and builds back references', async () => {
     const corpus = makeCorpus();
-    const { results, backRefs, diagnostics } = await compileCorpus(corpus);
+    const { results, index, diagnostics } = await compileCorpus(corpus);
     expect(diagnostics).toEqual([]);
     expect([...results.keys()]).toEqual(['article', 'summary']);
-    expect([...backRefs.keys()]).toEqual(['article#intro', 'article#pythagoras']);
-    expect(backRefs.get('article#intro')![0]!.node.type).toBe('link');
+    expect(index.incoming({ documentId: 'article', name: 'intro' }).map((e) => e.source)).toEqual(['link', 'link', 'link']); // article, summary, and the copy included into summary
+    expect(index.incoming({ documentId: 'article', name: 'pythagoras' }).map((e) => e.kind)).toEqual(['include']);
   });
 
   it('include cycles and self includes are diagnostics, not hangs', async () => {

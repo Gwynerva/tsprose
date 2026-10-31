@@ -3,6 +3,7 @@ import type { DefOf } from './node.js';
 import type { AnyTag } from './tag.js';
 import { canonicalJson } from './hash.js';
 import { s, withRefMeta, type Schema } from './standard.js';
+import { isPlainObject } from './util.js';
 
 export const REF: unique symbol = Symbol.for('tsprose.ref');
 export const REFS: unique symbol = Symbol.for('tsprose.refs');
@@ -115,11 +116,19 @@ export interface RefTarget<T extends string = string> {
   readonly __targetTag?: T;
 }
 
+const TARGET_KEYS = new Set(['documentId', 'name', 'params']);
+
+/**
+ * A serialized reference: `{ $ref }` whose value is a plain object with only `documentId`, `name` and `params`,
+ * naming an element (`name`) or a whole document (`documentId` without `name`).
+ */
 export function isRefTarget(value: unknown): value is RefTarget {
-  if (typeof value !== 'object' || value === null) return false;
-  const target = (value as { $ref?: unknown }).$ref;
-  if (typeof target !== 'object' || target === null) return false;
-  const { documentId, name } = target as { documentId?: unknown; name?: unknown };
+  if (!isPlainObject(value)) return false;
+  const target = value.$ref;
+  if (!isPlainObject(target) || Object.keys(target).some((key) => !TARGET_KEYS.has(key))) return false;
+  const { documentId, name, params } = target as { documentId?: unknown; name?: unknown; params?: unknown };
+  if (documentId !== undefined && typeof documentId !== 'string') return false;
+  if (params !== undefined && !isPlainObject(params)) return false;
   return typeof name === 'string' || (typeof documentId === 'string' && name === undefined);
 }
 
@@ -130,8 +139,8 @@ export function isRefTarget(value: unknown): value is RefTarget {
  * ```ts
  * declare module 'tsprose' {
  *   interface CorpusRegistry {
- *     'dem/1234': { statement: 'problemStatement'; solution: 'solution' };
- *     'ref/lagrange': { statement: 'theorem' };
+ *     'guide/intro': { overview: 'section'; install: 'section' };
+ *     'theorems/pythagoras': { statement: 'theorem' };
  *   }
  * }
  * ```
@@ -155,7 +164,8 @@ type RegistryTag<I, N> = I extends keyof CorpusRegistry
 /**
  * Reference a document or one of its elements by id — no import of the target module needed, so it works for
  * generated documents, documents stored elsewhere and mutual references alike:
- * `<Link to={ref('dem/1234', 'solution')}>`, `<Link to={ref('ref/lagrange')}>`, `ref('dem/1234', 'statement', { seed: 3 })`.
+ * `<Link to={ref('guide/intro', 'install')}>`, `<Link to={ref('theorems/pythagoras')}>`,
+ * `ref('exercises/12', 'statement', { seed: 3 })`.
  * The result is checked against {@link CorpusRegistry} at the type level and against the corpus index at build time.
  */
 export function ref<const I extends RegistryIds, const N extends RegistryNames<I> | undefined = undefined>(
@@ -171,8 +181,8 @@ export function ref<const I extends RegistryIds, const N extends RegistryNames<I
 }
 
 /**
- * Protocol for values that *are* references without being handles or `{ $ref }` objects — a path proxy such as
- * `$CONTENT.algebra.quadratic`, an ORM record, a route object: implement `[ADDRESS]()` and every TSProse reference
+ * Protocol for values that *are* references without being handles or `{ $ref }` objects — a path proxy
+ * (`site.guide.intro`), an ORM record, a route object: implement `[ADDRESS]()` and every TSProse reference
  * consumer (`refSchema`, outgoing references, JSON, `<Include>`, the index) treats the value as that address.
  * Return undefined when the value cannot be addressed (reported as `ref/unresolved`).
  */
@@ -182,6 +192,7 @@ export interface Addressable {
   readonly [ADDRESS]: () => Address | undefined;
 }
 
+/** Implements the {@link ADDRESS} protocol. */
 export function isAddressable(value: unknown): value is Addressable {
   return (typeof value === 'object' || typeof value === 'function') && value !== null && typeof (value as Addressable)[ADDRESS] === 'function';
 }
@@ -193,12 +204,22 @@ export function isReferenceValue(value: unknown): value is ReferenceValue {
   return isRef(value) || isRefTarget(value) || isAddressable(value);
 }
 
-/** Serialized form of a handle or an addressable; serialized references are returned as is. */
+/**
+ * Serialized form of a reference value; serialized references are returned as is. The `documentId` is undefined
+ * for an unbound handle or an addressable without an address.
+ */
 export function toRefTarget(value: ReferenceValue): RefTarget {
   if (isRef(value)) return { $ref: { documentId: value.scope.documentId, name: value.name } };
   if (isRefTarget(value)) return value;
   const address = value[ADDRESS]();
-  return address ? { $ref: { ...address } } : { $ref: { documentId: undefined } };
+  return { $ref: address ? { ...address } : { documentId: undefined } };
+}
+
+/** Human readable label of a reference value for diagnostics (`name`, `doc#name`, `doc`). */
+export function referenceLabel(value: ReferenceValue): string {
+  if (isRef(value)) return value.name;
+  const { documentId, name } = toRefTarget(value).$ref;
+  return name !== undefined && documentId ? `${documentId}#${name}` : (name ?? documentId ?? '?');
 }
 
 /** Canonical string of an address: `doc`, `doc#name`, with params appended as canonical JSON: `doc#name?{"seed":3}`. */
@@ -207,17 +228,15 @@ export function addressKey(address: Address): string {
   return address.params && Object.keys(address.params).length ? `${base}?${canonicalJson(address.params)}` : base;
 }
 
-/** Parse `doc` / `doc#name` (params are not parsed; use {@link ref} for them). */
+/** Parse `doc` / `doc#name` — the inverse of {@link addressKey} without params (use {@link ref} for params). */
 export function parseAddress(text: string): Address {
   const hash = text.indexOf('#');
   return hash < 0 ? { documentId: text } : { documentId: text.slice(0, hash), name: text.slice(hash + 1) };
 }
 
-/** Address of a handle or serialized reference (undefined while its document id is unknown). */
-export function addressOf(value: Ref | RefTarget | Addressable): Address | undefined {
-  if (!isRef(value) && !isRefTarget(value)) return value[ADDRESS]();
-  if (isRef(value)) return value.scope.documentId ? { documentId: value.scope.documentId, name: value.name } : undefined;
-  const { documentId, name, params } = value.$ref;
+/** Address of a reference value (undefined while a handle is unbound or an addressable has no address). */
+export function addressOf(value: ReferenceValue): Address | undefined {
+  const { documentId, name, params } = toRefTarget(value).$ref;
   if (!documentId) return undefined;
   return { documentId, ...(name !== undefined ? { name } : {}), ...(params !== undefined ? { params } : {}) };
 }
@@ -235,16 +254,20 @@ export interface RefSchemaOptions {
 }
 
 /**
- * Prop schema accepting a reference: a handle from `defineRefs` or an address from {@link ref}
- * (optionally restricted to one tag): `props: { to: refSchema() }`, `props: { proves: refSchema(Theorem, { kind: 'proves' }) }`.
- * `compile` turns such props into outgoing references of the given kind.
+ * Prop schema accepting a reference: a handle from `defineRefs`, an address from {@link ref} or an
+ * {@link Addressable} (optionally restricted to one tag): `props: { to: refSchema() }`,
+ * `props: { proves: refSchema(Theorem, { kind: 'proves' }) }`. `compile` turns such props into outgoing references
+ * of the given kind.
  */
-export function refSchema(options?: RefSchemaOptions): Schema<Ref | RefTarget>;
-export function refSchema<T extends AnyTag>(tag: T, options?: RefSchemaOptions): Schema<Ref<DefOf<T>> | RefTarget<DefOf<T>['name']>>;
-export function refSchema(a?: AnyTag | RefSchemaOptions, b?: RefSchemaOptions): Schema<Ref | RefTarget> {
+export function refSchema(options?: RefSchemaOptions): Schema<ReferenceValue>;
+export function refSchema<T extends AnyTag>(
+  tag: T,
+  options?: RefSchemaOptions,
+): Schema<Ref<DefOf<T>> | RefTarget<DefOf<T>['name']> | Addressable>;
+export function refSchema(a?: AnyTag | RefSchemaOptions, b?: RefSchemaOptions): Schema<ReferenceValue> {
   const tag = a && 'def' in a ? (a as AnyTag) : undefined;
   const options = (tag ? b : (a as RefSchemaOptions | undefined)) ?? {};
-  const schema = s.custom<Ref | RefTarget>(
+  const schema = s.custom<ReferenceValue>(
     (value) => (isRef(value) && (tag === undefined || value.def === tag.def)) || isRefTarget(value) || isAddressable(value),
     tag ? `Expected a ref to <${tag.def.name}>` : 'Expected a ref handle or a ref() address',
   );
