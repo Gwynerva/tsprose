@@ -1,6 +1,8 @@
 # @tsprose/testbed
 
-A proving ground shaped like Erudit + Open Math, so TSProse 2.0 is exercised at the scale and in the form of its real consumers.
+A private proving ground shaped like a real educational site generator (an Erudit-style kit and an Open-Math-sized
+corpus), so TSProse 2.0 is exercised at the scale and in the form of its real consumers. Not published; integration-specific
+names here are deliberate.
 
 - `src/kit.ts`, `src/tags.tsx` — an Erudit-like kit (`toc`/`snippet` common props, `title` meta, paragraph autowrap, title-based ids)
   and ~40 tags: paragraphs, headings (presets), inline/block math with simulated KaTeX `derive`, images/videos with asset probing,

@@ -1,88 +1,61 @@
 #!/usr/bin/env bun
-import { readdir, readFile, stat, writeFile } from 'node:fs/promises';
-import { dirname, join, resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
-import { type Kind } from './format.js';
-import { formatAsync, type PipelineOptions, type PreFormat } from './pipeline.js';
-import { inlineContainerFromTags, kindOfFromLists, kindOfFromTags, optionsFromDescription, type TagsDescriptionLike } from './kinds.js';
+import { readFile, writeFile } from 'node:fs/promises';
+import { missingPaths, walkProseFiles } from '@tsprose/transform/tooling';
+import { loadFmtConfig } from './config.js';
+import { formatAsync, type PipelineOptions } from './pipeline.js';
 
-function usage(): never {
-  console.error(
-    `tsprose-fmt [paths...] [--check] [--stdin [--stdin-filepath f]] [--config tsprose.config.ts] [--width 120] [--no-transform]\n` +
-      `  config module: export default { tags } (manifest) and/or { manifest, preFormat, refFirst, inlineTags, blockTags, inlineContainers, blockCalls, separateBlocks, compactContainers, printWidth, indent, transform }`,
-  );
-  process.exit(2);
+const USAGE =
+  `tsprose-fmt [paths...] [--check] [--stdin [--stdin-filepath f]] [--config tsprose.config.ts] [--width 120] [--no-transform]\n` +
+  `  --check            report files that need formatting, write nothing (exit 1 if any)\n` +
+  `  --stdin            format standard input to standard output (--stdin-filepath names it, default stdin.tsx)\n` +
+  `  --config <file>    tsprose.config.ts (or a JSON tags description): { manifest | tags + inlineComponents |\n` +
+  `                     inlineTags + blockTags + inlineContainers, blockCalls, preFormat, refFirst, separateBlocks,\n` +
+  `                     compactContainers, printWidth, indent, transform, closing, opening }\n` +
+  `  --width <n>        print width (overrides the config)\n` +
+  `  --no-transform     the build has no whitespace transform: emit {' '} where JSX needs it\n` +
+  `  --help             this text`;
+
+class UsageError extends Error {}
+
+interface Args {
+  readonly paths: string[];
+  readonly check: boolean;
+  readonly stdin: boolean;
+  readonly stdinPath: string;
+  readonly config: string | undefined;
+  readonly overrides: { printWidth?: number; transform?: boolean };
+  readonly help: boolean;
 }
 
-interface Config extends PipelineOptions {
-  readonly tags?: Record<string, { def: { kind: 'block' | 'inline' } }> | undefined;
-  readonly inlineTags?: readonly string[] | undefined;
-  readonly blockTags?: readonly string[] | undefined;
-  readonly inlineComponents?: readonly string[] | undefined;
-  /** Block tags whose children are inline-only (`P`, `Td`): blank lines inside them are spaces. */
-  readonly inlineContainers?: readonly string[] | undefined;
-  /** Code formatter run first (code outside prose, attribute values): `'oxfmt'`, `{ oxfmt: {…} }` or a function. */
-  readonly preFormat?: PreFormat | undefined;
-  /** A JSON tags description (`describeTags` output) or a path to one, relative to the config file. */
-  readonly manifest?: TagsDescriptionLike | string | undefined;
-  /** With `separateBlocks: true`: containers that stay compact (no blank lines added), e.g. `['Table', 'Tr', 'List']`. */
-  readonly compactContainers?: readonly string[] | undefined;
-}
-
-async function loadConfig(path: string | undefined): Promise<PipelineOptions> {
-  if (!path) return {};
-  const mod = (await import(pathToFileURL(resolve(path)).href)) as { default?: Config } & Config;
-  const cfg: Config = mod.default ?? mod;
-  let kindOf: ((name: string) => Kind) | undefined;
-  let isInlineContainer: ((name: string) => boolean) | undefined;
-  let blockCalls = cfg.blockCalls;
-  if (cfg.manifest) {
-    const description =
-      typeof cfg.manifest === 'string'
-        ? (JSON.parse(await readFile(resolve(dirname(resolve(path)), cfg.manifest), 'utf8')) as TagsDescriptionLike)
-        : cfg.manifest;
-    const fromManifest = optionsFromDescription(description);
-    kindOf = fromManifest.kindOf;
-    isInlineContainer = fromManifest.isInlineContainer;
-    blockCalls = [...fromManifest.blockCalls, ...(cfg.blockCalls ?? [])];
-  } else if (cfg.tags) {
-    kindOf = kindOfFromTags(cfg.tags, cfg.inlineComponents ?? []);
-    isInlineContainer = inlineContainerFromTags(cfg.tags);
-  } else if (cfg.inlineTags) {
-    kindOf = kindOfFromLists(cfg.inlineTags, cfg.blockTags ?? []);
-    const inline = new Set([...cfg.inlineTags, ...(cfg.inlineContainers ?? [])]);
-    isInlineContainer = (name) => inline.has(name);
-  }
-  return {
-    printWidth: cfg.printWidth,
-    indent: cfg.indent,
-    transform: cfg.transform,
-    kindOf,
-    isInlineContainer,
-    blockCalls,
-    separateBlocks:
-      cfg.separateBlocks === true && cfg.compactContainers?.length
-        ? ((compact) => (name: string | undefined) => name === undefined || !compact.has(name))(new Set(cfg.compactContainers))
-        : cfg.separateBlocks,
-    closing: cfg.closing,
-    opening: cfg.opening,
-    preFormat: cfg.preFormat,
-    refFirst: cfg.refFirst,
+function parseArgs(argv: readonly string[]): Args {
+  const paths: string[] = [];
+  let check = false;
+  let stdin = false;
+  let stdinPath = 'stdin.tsx';
+  let config: string | undefined;
+  let help = false;
+  const overrides: { printWidth?: number; transform?: boolean } = {};
+  const value = (i: number, flag: string): string => {
+    const v = argv[i];
+    if (v === undefined || v.startsWith('--')) throw new UsageError(`${flag} needs a value`);
+    return v;
   };
-}
-
-async function* walk(path: string): AsyncGenerator<string> {
-  const info = await stat(path);
-  if (info.isFile()) {
-    yield path;
-    return;
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i]!;
+    if (arg === '--check') check = true;
+    else if (arg === '--stdin') stdin = true;
+    else if (arg === '--stdin-filepath') stdinPath = value(++i, arg);
+    else if (arg === '--config') config = value(++i, arg);
+    else if (arg === '--width') {
+      const width = Number(value(++i, arg));
+      if (!Number.isInteger(width) || width <= 0) throw new UsageError(`--width must be a positive integer, got "${argv[i]}"`);
+      overrides.printWidth = width;
+    } else if (arg === '--no-transform') overrides.transform = false;
+    else if (arg === '--help' || arg === '-h') help = true;
+    else if (arg.startsWith('-')) throw new UsageError(`unknown option ${arg}`);
+    else paths.push(arg);
   }
-  for (const entry of await readdir(path, { withFileTypes: true })) {
-    if (entry.name === 'node_modules' || entry.name.startsWith('.')) continue;
-    const full = join(path, entry.name);
-    if (entry.isDirectory()) yield* walk(full);
-    else if (/\.(tsx|jsx)$/.test(entry.name)) yield full;
-  }
+  return { paths, check, stdin, stdinPath, config, overrides, help };
 }
 
 async function readStdin(): Promise<string> {
@@ -91,29 +64,41 @@ async function readStdin(): Promise<string> {
   return Buffer.concat(chunks).toString('utf8');
 }
 
+/** Run the CLI; resolves to the exit code (0 ok, 1 formatting needed or errors, 2 usage or setup errors). */
 export async function main(argv: string[]): Promise<number> {
-  const paths: string[] = [];
-  let check = false;
-  let stdin = false;
-  let stdinPath = 'stdin.tsx';
-  let config: string | undefined;
-  const overrides: { printWidth?: number; transform?: boolean } = {};
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i]!;
-    if (arg === '--check') check = true;
-    else if (arg === '--stdin') stdin = true;
-    else if (arg === '--stdin-filepath') stdinPath = argv[++i] ?? stdinPath;
-    else if (arg === '--config') config = argv[++i];
-    else if (arg === '--width') overrides.printWidth = Number(argv[++i]);
-    else if (arg === '--no-transform') overrides.transform = false;
-    else if (arg.startsWith('--')) usage();
-    else paths.push(arg);
+  let args: Args;
+  try {
+    args = parseArgs(argv);
+  } catch (error) {
+    if (!(error instanceof UsageError)) throw error;
+    console.error(`tsprose-fmt: ${error.message}\n\n${USAGE}`);
+    return 2;
   }
-  const options: PipelineOptions = { ...(await loadConfig(config)), ...overrides };
+  if (args.help) {
+    console.log(USAGE);
+    return 0;
+  }
+  if (!args.stdin && !args.paths.length) {
+    console.error(USAGE);
+    return 2;
+  }
 
-  if (stdin) {
+  let options: PipelineOptions = {};
+  if (args.config) {
+    try {
+      const loaded = await loadFmtConfig(args.config);
+      for (const warning of loaded.warnings) console.error(`warning: ${warning}`);
+      options = loaded.options;
+    } catch (error) {
+      console.error(`tsprose-fmt: cannot load config ${args.config}: ${(error as Error).message}`);
+      return 2;
+    }
+  }
+  options = { ...options, ...args.overrides };
+
+  if (args.stdin) {
     const source = await readStdin();
-    const result = await formatAsync(source, stdinPath, options);
+    const result = await formatAsync(source, args.stdinPath, options);
     if (result.errors.length) {
       console.error(result.errors.join('\n'));
       return 1;
@@ -122,13 +107,17 @@ export async function main(argv: string[]): Promise<number> {
     return 0;
   }
 
-  if (!paths.length) usage();
+  const missing = await missingPaths(args.paths);
+  if (missing.length) {
+    for (const path of missing) console.error(`tsprose-fmt: no such file or directory: ${path}`);
+    return 2;
+  }
   let changed = 0;
   let failed = 0;
   let count = 0;
   const started = performance.now();
-  for (const root of paths) {
-    for await (const file of walk(root)) {
+  for (const root of args.paths) {
+    for await (const file of walkProseFiles(root)) {
       count++;
       const source = await readFile(file, 'utf8');
       const result = await formatAsync(source, file, options);
@@ -139,12 +128,14 @@ export async function main(argv: string[]): Promise<number> {
       }
       if (!result.changed) continue;
       changed++;
-      if (check) console.log(`would format ${file}`);
+      if (args.check) console.log(`would format ${file}`);
       else await writeFile(file, result.code, 'utf8');
     }
   }
-  console.log(`${count} files, ${changed} ${check ? 'need formatting' : 'formatted'}, ${failed} with errors, ${(performance.now() - started).toFixed(0)} ms`);
-  return failed || (check && changed) ? 1 : 0;
+  console.log(
+    `${count} files, ${changed} ${args.check ? 'need formatting' : 'formatted'}, ${failed} with errors, ${(performance.now() - started).toFixed(0)} ms`,
+  );
+  return failed || (args.check && changed) ? 1 : 0;
 }
 
 if (import.meta.main) {

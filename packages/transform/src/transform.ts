@@ -1,5 +1,19 @@
 import MagicString, { type SourceMap } from 'magic-string';
-import { parseSync } from 'oxc-parser';
+import {
+  BLANK_RUN,
+  DEFAULT_CLOSING,
+  DEFAULT_OPENING,
+  classifyJsxChild,
+  computeLineStarts,
+  hasBlankLine,
+  hasNewline,
+  leadingWhitespace,
+  parseProse,
+  positionOf,
+  trailingWhitespace,
+  walkAst,
+  type OxcNode,
+} from './tooling.js';
 
 /**
  * TSProse whitespace rule: inside JSX, a line break between two pieces of inline content is a
@@ -53,16 +67,17 @@ export interface TransformResult {
   readonly map: SourceMap | undefined;
   /** Positions (in the original source) where `{" "}` was inserted. */
   readonly insertions: readonly Insertion[];
-  /** Parse errors reported by oxc (the transform still runs on the recoverable AST). */
+  /**
+   * Parse errors reported by oxc. The transform still runs on the recoverable AST; bundler plugins leave a file
+   * with parse errors untouched (the bundler then reports the error on the original source).
+   */
   readonly errors: readonly string[];
 }
 
-export const DEFAULT_CLOSING = '.,;:!?)]}»”’…';
-export const DEFAULT_OPENING = '([{«“‘';
+export { DEFAULT_CLOSING, DEFAULT_OPENING };
 
 const SPACE = '{" "}';
 const BREAK = '{"\\u2029"}';
-const PARAGRAPH_SEPARATOR = '\u2029';
 
 interface Item {
   readonly kind: 'text' | 'element' | 'expression' | 'comment' | 'space' | 'explicitSpace' | 'glue' | 'break';
@@ -84,98 +99,68 @@ interface Item {
   readonly tagName?: string | undefined;
 }
 
-interface AstNode {
-  type: string;
-  start: number;
-  end: number;
-  [key: string]: unknown;
-}
-
-const WS = /[ \t\r\n\f]/;
-
-function hasNewline(text: string): boolean {
-  return /[\r\n]/.test(text);
-}
-
-// One newline is \r\n, \n or a lone \r (never the \r of a \r\n pair: CRLF files must not see blank lines everywhere).
-const BLANK_RUN = /(?:\r\n|\r(?!\n)|\n)[ \t\f]*(?:(?:\r\n|\r(?!\n)|\n)[ \t\f]*)+/g;
-
-function hasBlankLine(text: string): boolean {
-  BLANK_RUN.lastIndex = 0;
-  return BLANK_RUN.test(text);
-}
-
 export function transform(source: string, fileName: string, options: TransformOptions = {}): TransformResult {
   const closing = options.closing ?? DEFAULT_CLOSING;
   const opening = options.opening ?? DEFAULT_OPENING;
-  const parsed = parseSync(fileName, source, { sourceType: 'module', lang: fileName.endsWith('.jsx') ? 'jsx' : 'tsx' });
+  const parsed = parseProse(source, fileName);
   const insertions = new Map<number, { between: 'text' | 'elements' | 'paragraph'; text: string }>();
   const isBlock = options.isBlock;
   const paragraphs = options.paragraphs === true;
+  /** Pairs [element start, attribute insertion offset]. */
   const positionAt: number[] = [];
 
-  const visitChildren = (children: AstNode[]): void => {
+  const visitChildren = (children: OxcNode[]): void => {
     const items: Item[] = [];
-    for (const child of children) {
-      switch (child.type) {
-        case 'JSXText': {
-          const raw = source.slice(child.start, child.end);
-          if (/^[ \t\r\n\f]*$/.test(raw)) {
-            items.push({ kind: 'space', start: child.start, end: child.end, separatorNewline: hasNewline(raw), separatorBlank: hasBlankLine(raw) });
-          } else {
-            const lead = raw.match(/^[ \t\r\n\f]*/)![0];
-            const trail = raw.match(/[ \t\r\n\f]*$/)![0];
-            const contentStart = child.start + lead.length;
-            const contentEnd = child.end - trail.length;
-            items.push({
-              kind: 'text',
-              start: child.start,
-              end: child.end,
-              contentStart,
-              contentEnd,
-              leadingNewline: hasNewline(lead),
-              trailingNewline: hasNewline(trail),
-              leadingBlank: hasBlankLine(lead),
-              trailingBlank: hasBlankLine(trail),
-              firstChar: source[contentStart]!,
-              lastChar: source[contentEnd - 1]!,
-            });
-            if (paragraphs) {
-              // Blank lines inside the text body: a paragraph break after each run.
-              const body = source.slice(contentStart, contentEnd);
-              BLANK_RUN.lastIndex = 0;
-              let m: RegExpExecArray | null;
-              while ((m = BLANK_RUN.exec(body)) !== null) {
-                insertions.set(contentStart + m.index + m[0].length, { between: 'paragraph', text: BREAK });
-              }
+    for (const node of children) {
+      const child = classifyJsxChild(node, source);
+      switch (child.kind) {
+        case 'whitespace':
+          items.push({ kind: 'space', start: node.start, end: node.end, separatorNewline: hasNewline(child.raw), separatorBlank: hasBlankLine(child.raw) });
+          break;
+        case 'text': {
+          const raw = child.raw;
+          const lead = leadingWhitespace(raw);
+          const trail = trailingWhitespace(raw);
+          const contentStart = node.start + lead.length;
+          const contentEnd = node.end - trail.length;
+          items.push({
+            kind: 'text',
+            start: node.start,
+            end: node.end,
+            contentStart,
+            contentEnd,
+            leadingNewline: hasNewline(lead),
+            trailingNewline: hasNewline(trail),
+            leadingBlank: hasBlankLine(lead),
+            trailingBlank: hasBlankLine(trail),
+            firstChar: source[contentStart]!,
+            lastChar: source[contentEnd - 1]!,
+          });
+          if (paragraphs) {
+            // Blank lines inside the text body: a paragraph break after each run.
+            const body = source.slice(contentStart, contentEnd);
+            for (const m of body.matchAll(BLANK_RUN)) {
+              insertions.set(contentStart + m.index + m[0].length, { between: 'paragraph', text: BREAK });
             }
           }
           break;
         }
-        case 'JSXExpressionContainer': {
-          const expression = child.expression as AstNode;
-          if (expression.type === 'JSXEmptyExpression') {
-            items.push({ kind: 'comment', start: child.start, end: child.end });
-          } else if (expression.type === 'Literal' && typeof expression.value === 'string') {
-            const value = expression.value;
-            items.push({ kind: literalKind(value), start: child.start, end: child.end });
-          } else if (expression.type === 'TemplateLiteral' && (expression.quasis as AstNode[]).length === 1 && (expression.expressions as AstNode[]).length === 0) {
-            const quasi = (expression.quasis as AstNode[])[0]!;
-            const value = String((quasi.value as { cooked?: string; raw: string }).cooked ?? (quasi.value as { raw: string }).raw);
-            items.push({ kind: literalKind(value), start: child.start, end: child.end });
-          } else {
-            items.push({ kind: 'expression', start: child.start, end: child.end });
-          }
+        case 'comment':
+        case 'glue':
+        case 'break':
+          items.push({ kind: child.kind, start: node.start, end: node.end });
           break;
-        }
-        case 'JSXElement':
-          items.push({ kind: 'element', start: child.start, end: child.end, tagName: jsxTagName(child) });
+        case 'space':
+          items.push({ kind: 'explicitSpace', start: node.start, end: node.end });
           break;
-        case 'JSXFragment':
-          items.push({ kind: 'element', start: child.start, end: child.end });
+        case 'element':
+          items.push({ kind: 'element', start: node.start, end: node.end, tagName: child.name });
+          break;
+        case 'fragment':
+          items.push({ kind: 'element', start: node.start, end: node.end });
           break;
         default:
-          items.push({ kind: 'expression', start: child.start, end: child.end });
+          items.push({ kind: 'expression', start: node.start, end: node.end });
       }
     }
 
@@ -236,31 +221,15 @@ export function transform(source: string, fileName: string, options: TransformOp
     }
   };
 
-  const literalKind = (value: string): Item['kind'] =>
-    value === '' ? 'glue' : value === PARAGRAPH_SEPARATOR ? 'break' : /^[ \t\r\n\f]*$/.test(value) ? 'explicitSpace' : 'expression';
-
-  const visit = (node: unknown): void => {
-    if (!node || typeof node !== 'object') return;
-    if (Array.isArray(node)) {
-      for (const n of node) visit(n);
-      return;
-    }
-    const n = node as AstNode;
-    if (n.type === 'JSXElement' || n.type === 'JSXFragment') {
-      visitChildren(n.children as AstNode[]);
-    }
+  walkAst<OxcNode>(parsed.program, (n) => {
+    if (n.type === 'JSXElement' || n.type === 'JSXFragment') visitChildren(n.children as OxcNode[]);
     if (options.positions && n.type === 'JSXOpeningElement') {
-      const name = n.name as AstNode;
-      const hasPos = (n.attributes as AstNode[]).some((a) => a.type === 'JSXAttribute' && (a.name as AstNode).name === '__tsprosePos');
-      if (!hasPos) positionAt.push(n.start, name.end);
+      const hasPos = (n.attributes as OxcNode[]).some((a) => a.type === 'JSXAttribute' && (a.name as OxcNode).name === '__tsprosePos');
+      // The attribute goes after the name and its type arguments (`<List<Item> …>`).
+      const after = (n.typeArguments as OxcNode | null | undefined) ?? (n.name as OxcNode);
+      if (!hasPos) positionAt.push(n.start, after.end);
     }
-    for (const key of Object.keys(n)) {
-      if (key === 'type' || key === 'start' || key === 'end' || key === 'range' || key === 'loc') continue;
-      const value = n[key];
-      if (value && typeof value === 'object') visit(value);
-    }
-  };
-  visit(parsed.program);
+  });
 
   const ms = new MagicString(source);
   const sorted = [...insertions.keys()].sort((a, b) => a - b);
@@ -271,7 +240,11 @@ export function transform(source: string, fileName: string, options: TransformOp
     ms.appendLeft(positionAt[i + 1]!, ` __tsprosePos={[__tsproseFile, ${line}, ${column}]}`);
   }
   if (positionAt.length) {
-    ms.prepend(`const __tsproseFile = ${JSON.stringify(options.positionsFile ?? fileName)};\n`);
+    const declaration = `const __tsproseFile = ${JSON.stringify(options.positionsFile ?? fileName)};`;
+    // After the hashbang and the directive prologue ('use client', 'use strict'), which must stay first.
+    const prologueEnd = prologueEndOf(parsed.program);
+    if (prologueEnd === 0) ms.prepend(`${declaration}\n`);
+    else ms.appendLeft(prologueEnd, `\n${declaration}`);
   }
   const changed = sorted.length > 0 || positionAt.length > 0;
 
@@ -286,48 +259,20 @@ export function transform(source: string, fileName: string, options: TransformOp
   };
 }
 
-function jsxTagName(element: AstNode): string | undefined {
-  const name = (element.openingElement as AstNode | undefined)?.name as AstNode | undefined;
-  if (!name) return undefined;
-  if (name.type === 'JSXIdentifier') return name.name as string;
-  if (name.type === 'JSXMemberExpression') return `${jsxNameText(name.object as AstNode)}.${(name.property as AstNode).name as string}`;
-  if (name.type === 'JSXNamespacedName') return `${(name.namespace as AstNode).name as string}:${(name.name as AstNode).name as string}`;
-  return undefined;
-}
-
-function jsxNameText(node: AstNode): string {
-  if (node.type === 'JSXIdentifier') return node.name as string;
-  if (node.type === 'JSXMemberExpression') return `${jsxNameText(node.object as AstNode)}.${(node.property as AstNode).name as string}`;
-  return '?';
-}
-
-function computeLineStarts(source: string): number[] {
-  const starts = [0];
-  for (let i = 0; i < source.length; i++) {
-    const ch = source.charCodeAt(i);
-    if (ch === 10) starts.push(i + 1);
-    else if (ch === 13) {
-      if (source.charCodeAt(i + 1) === 10) i++;
-      starts.push(i + 1);
-    }
+/** End offset of the hashbang and the leading directives of a program (0 when there are none). */
+function prologueEndOf(program: OxcNode): number {
+  let end = (program.hashbang as OxcNode | null | undefined)?.end ?? 0;
+  for (const statement of program.body as OxcNode[]) {
+    if (statement.type !== 'ExpressionStatement' || typeof statement.directive !== 'string') break;
+    end = statement.end;
   }
-  return starts;
+  return end;
 }
 
-function positionOf(lineStarts: number[], offset: number): { line: number; column: number } {
-  let lo = 0;
-  let hi = lineStarts.length - 1;
-  while (lo < hi) {
-    const mid = (lo + hi + 1) >> 1;
-    if (lineStarts[mid]! <= offset) lo = mid;
-    else hi = mid - 1;
-  }
-  return { line: lo + 1, column: offset - lineStarts[lo]! + 1 };
-}
-
-/** Quick check used by plugins to skip files without JSX. */
+/**
+ * Cheap pre-check used by the plugins to skip files without JSX: is there a `<` that can start a JSX element or
+ * fragment (`<Name`, `<>`)? False positives (`a <b`) only cost a parse; there are no false negatives.
+ */
 export function mayContainJsx(source: string): boolean {
-  return source.includes('<');
+  return /<\s*[A-Za-z_$>]/.test(source);
 }
-
-export { WS };

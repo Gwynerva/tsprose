@@ -65,7 +65,7 @@ describe('testbed site build', async () => {
     const targets = article.result.outgoing.map((o) => o.target);
     expect(targets).toContainEqual({ documentId: 'foundations/equations/quadratic/completing-the-square/article', name: 'method' });
     expect(targets).toContainEqual({ documentId: 'foundations/equations/quadratic/quadratic-formula/article', name: 'formula' });
-    expect([...site.backRefs.keys()]).toContain('foundations/equations/quadratic/completing-the-square/article#method');
+    expect(site.index.incoming({ documentId: 'foundations/equations/quadratic/completing-the-square/article', name: 'method' }).length).toBeGreaterThan(0);
   });
 
   it('summary transcludes compiled copies', () => {

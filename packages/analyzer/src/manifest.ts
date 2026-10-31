@@ -1,11 +1,10 @@
-import { pathToFileURL } from 'node:url';
-import { resolve } from 'node:path';
+import { loadTsproseConfig, type LoadedConfig } from '@tsprose/transform/tooling';
 import { collectTags, isTagsDescription, s, type AnyTag, type BaseDef, type TagsDescription } from 'tsprose';
 import type { Manifest } from './types.js';
 
 /** Build a manifest from a module namespace or plain object: every exported tag under its export name. */
 export function manifestFromExports(exportsObject: Record<string, unknown>, extra: Omit<Manifest, 'tags'> = {}): Manifest {
-  // Tags, member tags (`Problem.Hint`), templates and components carrying a definition.
+  // Tags, member tags (`List.Item`), templates and components carrying a definition.
   const tags = collectTags(exportsObject) as Record<string, AnyTag>;
   return { tags, ...extra };
 }
@@ -67,16 +66,38 @@ export function defineManifest(manifest: Manifest): Manifest {
 }
 
 /**
- * Load `tsprose.config.ts` (or any module). The module may `export default` a Manifest or export tags directly.
- * Requires a runtime that can import TypeScript (Bun, or Node with type stripping).
+ * Manifest from a loaded `tsprose.config.ts` (see `TsproseConfig` in `@tsprose/transform/tooling`):
+ * - `manifest` (a JSON tags description) → {@link manifestFromDescription}; `wrapsLooseInline` and `transform`
+ *   default to true (descriptions come from kits that autowrap, built with the transform);
+ * - `tags` (a tag map or a JSON tags description) plus `inlineComponents`, flags as written;
+ * - neither: the module's exports are the tags ({@link manifestFromExports}).
+ */
+export function manifestFromConfig(loaded: LoadedConfig): Manifest {
+  const config = loaded.config;
+  const extra = {
+    inlineComponents: config.inlineComponents,
+    mathTags: config.mathTags,
+  };
+  if (config.manifest && typeof config.manifest === 'object') {
+    return manifestFromDescription(config.manifest as unknown as TagsDescription, {
+      ...extra,
+      wrapsLooseInline: config.wrapsLooseInline ?? true,
+      transform: config.transform ?? true,
+    });
+  }
+  if (config.tags) {
+    const flags = { ...extra, wrapsLooseInline: config.wrapsLooseInline, transform: config.transform };
+    return isTagsDescription(config.tags)
+      ? manifestFromDescription(config.tags, flags)
+      : { tags: config.tags as Record<string, AnyTag>, ...flags };
+  }
+  return manifestFromExports({ ...loaded.module });
+}
+
+/**
+ * Load `tsprose.config.ts` (or any module), or a JSON tags description (`.json`), as a manifest; see
+ * {@link manifestFromConfig}. Modules need a runtime that can import TypeScript (Bun, or Node with type stripping).
  */
 export async function loadManifest(path: string): Promise<Manifest> {
-  if (path.endsWith('.json')) {
-    const { readFile } = await import('node:fs/promises');
-    return manifestFromDescription(JSON.parse(await readFile(resolve(path), 'utf8')) as TagsDescription, { wrapsLooseInline: true, transform: true });
-  }
-  const mod = (await import(pathToFileURL(resolve(path)).href)) as Record<string, unknown>;
-  const def = mod.default as Manifest | undefined;
-  if (def && typeof def === 'object' && 'tags' in def) return def;
-  return manifestFromExports(mod);
+  return manifestFromConfig(await loadTsproseConfig(path));
 }

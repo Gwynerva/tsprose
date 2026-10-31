@@ -1,4 +1,16 @@
-import { parseSync } from 'oxc-parser';
+import {
+  BLANK_RUN,
+  DEFAULT_CLOSING,
+  DEFAULT_OPENING,
+  classifyJsxChild,
+  detectEol,
+  elementName,
+  parseProse,
+  restoreEol,
+  toLf,
+  walkAst,
+  type OxcNode as AstNode,
+} from '@tsprose/transform/tooling';
 
 /**
  * @tsprose/fmt — a narrow, fast formatter for prose files.
@@ -32,7 +44,7 @@ export interface FormatOptions {
    */
   readonly isInlineContainer?: ((tagName: string) => boolean) | undefined;
   /**
-   * Functions whose calls produce block nodes (`{mm\`…\`}`, `{mm({ freeze: true })\`…\`}`, `{figure(…)}`):
+   * Functions whose calls produce block nodes (`{display\`…\`}`, `{display({ numbered: true })\`…\`}`, `{figure(…)}`):
    * such expressions are laid out on their own line like block tags instead of being filled into text.
    */
   readonly blockCalls?: readonly string[] | undefined;
@@ -62,19 +74,6 @@ export interface FormatResult {
   readonly errors: readonly string[];
 }
 
-const DEFAULT_CLOSING = '.,;:!?)]}»”’…';
-const DEFAULT_OPENING = '([{«“‘';
-const PARAGRAPH_SEPARATOR = '\u2029';
-// One newline is \r\n, \n or a lone \r (CRLF must not look like a blank line).
-const BLANK_RUN = /((?:\r\n|\r(?!\n)|\n)[ \t\f]*(?:(?:\r\n|\r(?!\n)|\n)[ \t\f]*)+)/;
-
-interface AstNode {
-  type: string;
-  start: number;
-  end: number;
-  [key: string]: unknown;
-}
-
 type Sep = 'none' | 'space' | 'newline';
 
 interface Token {
@@ -99,10 +98,11 @@ interface Ctx {
   readonly opening: string;
 }
 
+// JSX whitespace plus a literal paragraph separator: nothing to print as a word.
 const WS_ONLY = /^[ \t\r\n\f\u2029]*$/;
 
 export function format(source: string, fileName: string, options: FormatOptions = {}): FormatResult {
-  const parsed = parseSync(fileName, source, { sourceType: 'module', lang: fileName.endsWith('.jsx') ? 'jsx' : 'tsx' });
+  const parsed = parseProse(source, fileName);
   const errors = parsed.errors.map((e) => e.message);
   if (errors.length) return { code: source, changed: false, errors };
 
@@ -123,52 +123,38 @@ export function format(source: string, fileName: string, options: FormatOptions 
   };
 
   const regions: AstNode[] = [];
-  collectRegions(parsed.program as unknown as AstNode, regions);
+  collectRegions(parsed.program, regions);
   if (!regions.length) return { code: source, changed: false, errors };
 
   // Keep the file's line endings: printed regions use \n internally.
-  const crlf = source.includes('\r\n');
+  const eol = detectEol(source);
   let out = '';
   let cursor = 0;
   for (const region of regions.sort((a, b) => a.start - b.start)) {
     out += source.slice(cursor, region.start);
-    const printed = printBlockLike(region, lineIndent(source, region.start), ctx).replace(/\r\n/g, '\n');
-    out += crlf ? printed.replace(/\n/g, '\r\n') : printed;
+    out += restoreEol(toLf(printBlockLike(region, lineIndent(source, region.start), ctx)), eol);
     cursor = region.end;
   }
   out += source.slice(cursor);
   return { code: out, changed: out !== source, errors };
 }
 
-function collectRegions(node: unknown, out: AstNode[]): void {
-  if (!node || typeof node !== 'object') return;
-  if (Array.isArray(node)) {
-    for (const n of node) collectRegions(n, out);
-    return;
-  }
-  const n = node as AstNode;
-  if (n.type === 'JSXElement' || n.type === 'JSXFragment') {
+/** Outermost JSX elements and fragments under `root` (`root` itself excluded): the regions to print. */
+function collectRegions(root: AstNode, out: AstNode[]): void {
+  walkAst<AstNode>(root, (n) => {
+    if (n === root || (n.type !== 'JSXElement' && n.type !== 'JSXFragment')) return;
     out.push(n);
-    return; // nested JSX inside expressions is printed verbatim as part of the region
-  }
-  for (const key of Object.keys(n)) {
-    if (key === 'type' || key === 'start' || key === 'end' || key === 'loc' || key === 'range') continue;
-    const v = n[key];
-    if (v && typeof v === 'object') collectRegions(v, out);
-  }
+    return false; // nested JSX inside expressions is printed as part of the region
+  });
 }
 
 /**
  * Source of an expression (or attribute) with the JSX nested inside it formatted too:
- * `{expandSub(a, b, <Problem.Hint>…</Problem.Hint>)}`, `{cond && <P>…</P>}`. Code around the JSX stays verbatim.
+ * `{helper(a, b, <List.Item>…</List.Item>)}`, `{cond && <P>…</P>}`. Code around the JSX stays verbatim.
  */
 function verbatim(node: AstNode, ctx: Ctx): string {
   const regions: AstNode[] = [];
-  for (const key of Object.keys(node)) {
-    if (key === 'type' || key === 'start' || key === 'end' || key === 'loc' || key === 'range') continue;
-    const value = node[key];
-    if (value && typeof value === 'object') collectRegions(value, regions);
-  }
+  collectRegions(node, regions);
   if (!regions.length) return ctx.source.slice(node.start, node.end);
   let out = '';
   let cursor = node.start;
@@ -208,14 +194,7 @@ function isFragment(node: AstNode): boolean {
 }
 
 function tagName(node: AstNode): string {
-  return nameText((node.openingElement as AstNode).name as AstNode);
-}
-
-function nameText(name: AstNode): string {
-  if (name.type === 'JSXIdentifier') return name.name as string;
-  if (name.type === 'JSXMemberExpression') return `${nameText(name.object as AstNode)}.${nameText(name.property as AstNode)}`;
-  if (name.type === 'JSXNamespacedName') return `${nameText(name.namespace as AstNode)}:${nameText(name.name as AstNode)}`;
-  return '?';
+  return elementName(node) ?? '?';
 }
 
 type Child =
@@ -228,9 +207,11 @@ type Child =
 function childrenOf(node: AstNode, ctx: Ctx): Child[] {
   const out: Child[] = [];
   for (const child of node.children as AstNode[]) {
-    switch (child.type) {
-      case 'JSXText': {
-        const raw = ctx.source.slice(child.start, child.end);
+    const c = classifyJsxChild(child, ctx.source);
+    switch (c.kind) {
+      case 'text':
+      case 'whitespace': {
+        const raw = c.raw;
         if (WS_ONLY.test(raw)) {
           const newlines = raw.split(/\r\n|\r|\n/).length - 1;
           // Standard JSX input: blank lines carry no meaning (paragraph breaks arrive as {"\u2029"}).
@@ -248,23 +229,27 @@ function childrenOf(node: AstNode, ctx: Ctx): Child[] {
         }
         break;
       }
-      case 'JSXExpressionContainer': {
-        const expr = child.expression as AstNode;
-        if (expr.type === 'JSXEmptyExpression') out.push({ kind: 'comment', node: child });
-        else if (expr.type === 'Literal' && typeof expr.value === 'string') {
-          const v = expr.value;
-          if (v === PARAGRAPH_SEPARATOR) out.push({ kind: 'blank' });
-          else out.push({ kind: 'expression', node: child, space: v !== '' && WS_ONLY.test(v), glue: v === '' });
-        } else out.push({ kind: 'expression', node: child, space: false, glue: false, block: isBlockCall(expr, ctx) });
+      case 'comment':
+        out.push({ kind: 'comment', node: child });
         break;
-      }
-      case 'JSXElement':
-        out.push({ kind: 'element', node: child, inline: ctx.kindOf(tagName(child)) === 'inline' });
+      case 'break':
+        out.push({ kind: 'blank' });
         break;
-      case 'JSXFragment':
+      case 'space':
+      case 'glue':
+        out.push({ kind: 'expression', node: child, space: c.kind === 'space', glue: c.kind === 'glue' });
+        break;
+      case 'element':
+        out.push({ kind: 'element', node: child, inline: ctx.kindOf(c.name ?? '?') === 'inline' });
+        break;
+      case 'fragment':
         out.push({ kind: 'element', node: child, inline: false });
         break;
+      case 'expression':
+        out.push({ kind: 'expression', node: child, space: false, glue: false, block: isBlockCall(c.expression, ctx) });
+        break;
       default:
+        // Static strings, templates and other literals: printed verbatim, filled like words.
         out.push({ kind: 'expression', node: child, space: false, glue: false });
     }
   }
@@ -275,7 +260,7 @@ function hasBlockChildren(children: Child[]): boolean {
   return children.some((c) => (c.kind === 'element' && !c.inline) || (c.kind === 'expression' && c.block));
 }
 
-/** `mm\`…\``, `mm(opts)\`…\``, `mm(…)` where `mm` is listed in `blockCalls`. */
+/** `f\`…\``, `f(opts)\`…\``, `f(…)` where `f` is listed in `blockCalls`. */
 function isBlockCall(expr: AstNode, ctx: Ctx): boolean {
   if (!ctx.blockCalls.size) return false;
   let callee: AstNode | undefined =
@@ -344,7 +329,7 @@ function printBlockLike(node: AstNode, indent: string, ctx: Ctx): string {
   if (!hasBlockChildren(children) && (inlineContainer || !hasParagraphBreak(children))) {
     const head = openTag(node, indent, ctx, false, false);
     const tail = closeTag(node);
-    // A single verbatim expression hugs its tag: <BlockMath>{math`…`}</BlockMath>
+    // A single verbatim expression hugs its tag: <Formula>{math`…`}</Formula>
     const only = children.filter((c) => !(c.kind === 'text' && WS_ONLY.test(c.raw)) && c.kind !== 'blank');
     if (only.length === 1 && only[0]!.kind === 'expression' && !only[0]!.space && !only[0]!.glue && !head.includes('\n')) {
       const n = only[0]!.node;

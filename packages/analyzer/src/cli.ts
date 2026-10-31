@@ -1,70 +1,102 @@
 #!/usr/bin/env bun
-import { readdir, readFile, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
-import { analyzeSource, applyFixes, formatFinding } from './analyze.js';
-import { loadManifest } from './manifest.js';
-import type { Located } from './types.js';
+import { readFile, writeFile } from 'node:fs/promises';
+import { loadTsproseConfig, missingPaths, walkProseFiles } from '@tsprose/transform/tooling';
+import { ALL_RULES, analyzeSource, fixSource, formatFinding } from './analyze.js';
+import { manifestFromConfig } from './manifest.js';
+import type { Located, Manifest, RuleName } from './types.js';
 
-function usage(): never {
-  console.error(`tsprose check [paths...] --config tsprose.config.ts [--fix] [--json] [--rules children,props,refs,whitespace,braces]`);
-  process.exit(2);
-}
+const USAGE =
+  `tsprose check [paths...] --config <tsprose.config.ts | tags.json> [--fix] [--json] [--rules ${ALL_RULES.join(',')}]\n` +
+  `  exit code: 0 no errors, 1 errors (findings or parse errors), 2 usage or setup errors`;
 
-async function* walk(path: string): AsyncGenerator<string> {
-  const { stat } = await import('node:fs/promises');
-  const info = await stat(path);
-  if (info.isFile()) {
-    yield path;
-    return;
-  }
-  for (const entry of await readdir(path, { withFileTypes: true })) {
-    if (entry.name === 'node_modules' || entry.name.startsWith('.')) continue;
-    const full = join(path, entry.name);
-    if (entry.isDirectory()) yield* walk(full);
-    else if (/\.(tsx|jsx)$/.test(entry.name)) yield full;
-  }
-}
+class UsageError extends Error {}
 
-export async function main(argv: string[]): Promise<number> {
+function parseArgs(argv: readonly string[]): { paths: string[]; config: string; fix: boolean; json: boolean; rules: RuleName[] | undefined } {
   const [command, ...rest] = argv;
-  if (command !== 'check') usage();
+  if (command !== 'check') throw new UsageError(command === undefined ? 'missing command' : `unknown command "${command}"`);
   const paths: string[] = [];
   let config: string | undefined;
   let fix = false;
   let json = false;
-  let rules: string[] | undefined;
+  let rules: RuleName[] | undefined;
+  const value = (i: number, flag: string): string => {
+    const v = rest[i];
+    if (v === undefined || v.startsWith('--')) throw new UsageError(`${flag} needs a value`);
+    return v;
+  };
   for (let i = 0; i < rest.length; i++) {
     const arg = rest[i]!;
-    if (arg === '--config') config = rest[++i];
+    if (arg === '--config') config = value(++i, arg);
     else if (arg === '--fix') fix = true;
     else if (arg === '--json') json = true;
-    else if (arg === '--rules') rules = rest[++i]?.split(',');
-    else if (arg.startsWith('--')) usage();
+    else if (arg === '--rules') {
+      const names = value(++i, arg).split(',').map((r) => r.trim()).filter(Boolean);
+      const unknown = names.filter((r) => !(ALL_RULES as readonly string[]).includes(r));
+      if (unknown.length || !names.length) throw new UsageError(`unknown rule ${unknown.join(', ') || '(none)'}; rules: ${ALL_RULES.join(', ')}`);
+      rules = names as RuleName[];
+    } else if (arg.startsWith('-')) throw new UsageError(`unknown option ${arg}`);
     else paths.push(arg);
   }
-  if (!config) usage();
-  const manifest = await loadManifest(config);
+  if (!config) throw new UsageError('--config is required');
+  return { paths, config, fix, json, rules };
+}
+
+/** Run the CLI; resolves to the exit code (0 no errors, 1 errors, 2 usage or setup errors). */
+export async function main(argv: string[]): Promise<number> {
+  let args: ReturnType<typeof parseArgs>;
+  try {
+    args = parseArgs(argv);
+  } catch (error) {
+    if (!(error instanceof UsageError)) throw error;
+    console.error(`tsprose: ${error.message}\n\n${USAGE}`);
+    return 2;
+  }
+  let manifest: Manifest;
+  try {
+    const loaded = await loadTsproseConfig(args.config);
+    for (const warning of loaded.warnings) console.error(`warning: ${warning}`);
+    manifest = manifestFromConfig(loaded);
+  } catch (error) {
+    console.error(`tsprose: cannot load config ${args.config}: ${(error as Error).message}`);
+    return 2;
+  }
+  const roots = args.paths.length ? args.paths : ['.'];
+  const missing = await missingPaths(roots);
+  if (missing.length) {
+    for (const path of missing) console.error(`tsprose: no such file or directory: ${path}`);
+    return 2;
+  }
+
+  const options = { manifest, rules: args.rules };
   const all: Located[] = [];
   let files = 0;
-  for (const root of paths.length ? paths : ['.']) {
-    for await (const file of walk(root)) {
+  let parseErrors = 0;
+  let fixed = 0;
+  for (const root of roots) {
+    for await (const file of walkProseFiles(root)) {
       files++;
       const source = await readFile(file, 'utf8');
-      const result = analyzeSource(source, file, { manifest, rules: rules as never });
+      const result = args.fix ? fixSource(source, file, options) : { ...analyzeSource(source, file, options), code: source };
       for (const error of result.errors) console.error(`${file}: parse error: ${error}`);
-      if (fix && result.findings.some((f) => f.fix)) {
-        await writeFile(file, applyFixes(source, result.findings), 'utf8');
+      if (result.errors.length) parseErrors++;
+      if (result.code !== source) {
+        await writeFile(file, result.code, 'utf8');
+        fixed++;
       }
       all.push(...result.findings);
     }
   }
-  if (json) console.log(JSON.stringify(all, null, 2));
+  const errors = all.filter((f) => f.severity === 'error').length;
+  if (args.json) console.log(JSON.stringify(all, null, 2));
   else {
     for (const f of all) console.log(formatFinding(f));
-    const errors = all.filter((f) => f.severity === 'error').length;
-    console.log(`\n${files} files, ${errors} errors, ${all.length - errors} warnings${fix ? ' (fixes applied)' : ''}`);
+    console.log(
+      `\n${files} files, ${errors} errors, ${all.length - errors} warnings` +
+        (parseErrors ? `, ${parseErrors} files with parse errors` : '') +
+        (args.fix ? ` (${fixed} files fixed)` : ''),
+    );
   }
-  return all.some((f) => f.severity === 'error') ? 1 : 0;
+  return errors || parseErrors ? 1 : 0;
 }
 
 if (import.meta.main) {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { analyzeSource, applyFixes } from '../src/analyze.js';
+import { analyzeSource, applyFixes, fixSource } from '../src/analyze.js';
 import { manifest, manifestTransform, manifestWrapping } from './fixtures.js';
 
 const run = (source: string, m = manifest) => analyzeSource(source, 'doc.tsx', { manifest: m });
@@ -162,5 +162,60 @@ describe('braces rule', () => {
     const src = 'const x = <P>Число <M>5 + \\sqrt{20}</M>, <M>x^{2}</M>, <M>{n}</M> и {m`\\sqrt{2}`}</P>;';
     const found = run(src).findings.filter((f) => f.rule === 'braces');
     expect(found.map((f) => f.message.split(' is ')[0])).toEqual(['"{20}" after "\\sqrt"', '"{2}" after "^"']);
+  });
+});
+
+describe('paragraph breaks and fragments', () => {
+  it("{'\\u2029'} is a paragraph break, not text", () => {
+    expect(codes(`const x = <Proof><P>a</P>{'\\u2029'}<P>b</P></Proof>;`)).toEqual([]);
+    expect(codes('const x = <Proof><P>a</P>{"\\u2029"}<Qed /></Proof>;')).toEqual([]);
+  });
+
+  it('static whitespace templates are spaces, not text', () => {
+    expect(codes('const x = <Proof><P>a</P>{` `}<P>b</P></Proof>;')).toEqual([]);
+  });
+
+  it('braces are checked inside fragments', () => {
+    const found = run('const x = <>\\sqrt{20}</>;').findings.filter((f) => f.rule === 'braces');
+    expect(found.map((f) => f.code)).toEqual(['braces/jsx-expression']);
+  });
+
+  it('space hacks are checked inside fragments', () => {
+    const src = "const x = (\n  <>\n    word{' '}\n    <B>b</B>\n  </>\n);";
+    expect(run(src, manifestTransform).findings.map((f) => f.code)).toEqual(['whitespace/space-hack']);
+  });
+
+  it('space hacks: any whitespace-only string, templates included', () => {
+    const src = 'const x = (\n  <P>\n    word{` `}\n    <B>b</B>\n  </P>\n);';
+    expect(run(src, manifestTransform).findings.map((f) => f.code)).toEqual(['whitespace/space-hack']);
+  });
+
+  it('mathTags limits the braces rule to those tags', () => {
+    const src = 'const x = <P>x^{2} <M>\\sqrt{20}</M></P>;';
+    const all = run(src).findings.filter((f) => f.rule === 'braces');
+    const math = run(src, { ...manifest, mathTags: ['M'] }).findings.filter((f) => f.rule === 'braces');
+    expect(all).toHaveLength(2);
+    expect(math.map((f) => f.message.split(' is ')[0])).toEqual(['"{20}" after "\\sqrt"']);
+  });
+});
+
+describe('broken files and fixes', () => {
+  it('a file with parse errors gets errors and no findings', () => {
+    const r = run('const x = <P centre>text <Qed /></P>;\nconst y = <P>unclosed;');
+    expect(r.errors.length).toBeGreaterThan(0);
+    expect(r.findings).toEqual([]);
+  });
+
+  it('fixSource re-analyzes until nothing is fixable', () => {
+    const src = 'const x = (\n  <P>\n    word\n    <B>b</B>\n    tail\n  </P>\n);';
+    const r = fixSource(src, 'doc.tsx', { manifest });
+    expect(r.code).toBe("const x = (\n  <P>\n    word\n    {' '}<B>b</B>\n    {' '}tail\n  </P>\n);");
+    expect(r.findings.filter((f) => f.rule === 'whitespace')).toEqual([]);
+    expect(r.passes).toBe(1);
+  });
+
+  it('fixSource changes nothing in a broken file', () => {
+    const src = 'const x = (\n  <P>\n    word\n    <B>b</B>\n  </P>\n);\nconst y = <P>unclosed;';
+    expect(fixSource(src, 'doc.tsx', { manifest }).code).toBe(src);
   });
 });

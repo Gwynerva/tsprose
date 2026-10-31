@@ -1,0 +1,10 @@
+# Only the bundled extension (dist/extension.js), package.json, README and LICENSE ship in the .vsix.
+src/**
+test/**
+node_modules/**
+**/*.map
+**/*.ts
+*.vsix
+tsconfig.json
+vitest.config.ts
+.vscode/**

@@ -65,8 +65,6 @@ export function checkChildren(element: EsNode, source: string, manifest: Manifes
         `${label} cannot contain <${child.name}>; allowed: ${[...rule.tags!.keys()].map((t) => `<${t}>`).join(', ')}`,
         child.node,
       );
-    } else if (rule.mode === 'kind' && rule.kind === 'inline' && childDef.kind === 'inline' && def.kind === 'inline') {
-      // inline in inline is fine
     }
   }
 

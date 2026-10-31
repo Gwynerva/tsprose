@@ -39,7 +39,7 @@ export interface TagsDescriptionLike {
 
 /**
  * Formatter options from a JSON tags description: tag kinds (member tags included), inline-only containers,
- * and block-producing templates (`{mm\`…\`}`) — nothing to list by hand.
+ * and block-producing templates (`{display\`…\`}`) — nothing to list by hand.
  */
 export function optionsFromDescription(description: TagsDescriptionLike): {
   kindOf: (name: string) => Kind;

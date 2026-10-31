@@ -33,7 +33,7 @@ if (byCode.size) console.log(`diagnostics by code: ${[...byCode].map(([c, n]) =>
 console.log(`load ${ms(built.stats.loadMs)} · compile ${ms(built.stats.compileMs)} · render ${ms(built.stats.renderMs)} · json round-trip ${ms(built.stats.jsonMs)} · heap +${mb(heap1 - heap0)}`);
 const htmlBytes = built.built.reduce((n, d) => n + d.html.length, 0);
 const jsonBytes = built.built.reduce((n, d) => n + d.json.length, 0);
-console.log(`html ${mb(htmlBytes)} · json ${mb(jsonBytes)} · back references: ${built.backRefs.size} targets`);
+console.log(`html ${mb(htmlBytes)} · json ${mb(jsonBytes)} · references: ${built.index.edges().length}`);
 
 // 2. Hash collisions: same hash must mean same canonical content
 const byHash = new Map<string, string>();

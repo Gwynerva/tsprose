@@ -22,7 +22,7 @@ export type RuleName = 'children' | 'props' | 'refs' | 'whitespace' | 'braces';
 
 /**
  * What the analyzer knows about a project: the JSX names in scope and the tags behind them.
- * Erudit-style projects expose tags as globals; a plain project maps the exported names.
+ * Projects that expose tags as globals list them under their global names; a plain project maps the exported names.
  */
 export interface Manifest {
   /** JSX name (as written in files) → tag. */
@@ -33,6 +33,8 @@ export interface Manifest {
   readonly transform?: boolean | undefined;
   /** Names of component functions (not tags) that are known to produce inline content. */
   readonly inlineComponents?: readonly string[] | undefined;
+  /** Tags whose text is LaTeX: the `braces` rule checks only their children (default: every element). */
+  readonly mathTags?: readonly string[] | undefined;
 }
 
 export interface Located extends Finding {

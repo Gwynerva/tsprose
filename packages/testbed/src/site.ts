@@ -1,5 +1,5 @@
 // Build "the site": load, compile the corpus, render HTML, serialize JSON — what a generator does.
-import { compileCorpus, toJSON, fromJSON, createProse, type CompileResult, type ProseNode } from 'tsprose';
+import { compileCorpus, toJSON, fromJSON, createProse, type CompileResult, type CorpusIndex, type ProseNode } from 'tsprose';
 import { hooks } from './hooks.js';
 import { kit } from './kit.js';
 import { loadCorpus, type Importer } from './loader.js';
@@ -29,11 +29,11 @@ export const prose = createProse({ tags: Object.values(allTags) });
 
 export const numbering = { statement: 'statement', term: 'statement', important: 'statement', problem: 'problem', problems: 'problem' };
 
-export async function buildSite(root: string, options: { delay?: number; concurrency?: number; importer?: Importer } = {}): Promise<{ built: BuiltDocument[]; stats: BuildStats; backRefs: Map<string, unknown[]> }> {
+export async function buildSite(root: string, options: { delay?: number; concurrency?: number; importer?: Importer } = {}): Promise<{ built: BuiltDocument[]; stats: BuildStats; index: CorpusIndex }> {
   const t0 = performance.now();
   const { corpus } = await loadCorpus(root, options.importer);
   const t1 = performance.now();
-  const { results, backRefs, diagnostics } = await compileCorpus(corpus, {
+  const { results, index, diagnostics } = await compileCorpus(corpus, {
     kit: kit.kit,
     hooks,
     numbering,
@@ -63,7 +63,7 @@ export async function buildSite(root: string, options: { delay?: number; concurr
   const t4 = performance.now();
   return {
     built,
-    backRefs: backRefs as Map<string, unknown[]>,
+    index,
     stats: {
       documents: built.length,
       nodes,

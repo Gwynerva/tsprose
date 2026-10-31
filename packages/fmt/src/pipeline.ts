@@ -1,5 +1,5 @@
-import { parseSync } from 'oxc-parser';
 import { transform } from '@tsprose/transform';
+import { detectEol, parseProse, restoreEol, toLf, walkAst, type OxcNode } from '@tsprose/transform/tooling';
 import { format, type FormatOptions, type FormatResult } from './format.js';
 
 /** Options passed to oxfmt (its `FormatConfig`); typed loosely so oxfmt stays an optional dependency. */
@@ -7,7 +7,7 @@ export type OxfmtOptions = Readonly<Record<string, unknown>>;
 
 /**
  * A code formatter run before the prose pass: it owns code outside the prose trees, attribute values and
- * expressions (imports, helpers, `snippet={{ … }}`, scripts); `tsprose-fmt` then re-prints the prose itself.
+ * expressions (imports, helpers, `options={{ … }}`, scripts); `tsprose-fmt` then re-prints the prose itself.
  * - `'oxfmt'`: oxfmt (optional peer dependency) with `printWidth`/indent taken from these options;
  * - `{ oxfmt: { singleQuote: true, … } }`: oxfmt with extra options;
  * - a function: any formatter (Prettier, Biome, dprint…); it receives standard-JSX source and must keep its meaning.
@@ -57,44 +57,36 @@ async function runPreFormat(
   return result.code;
 }
 
-interface Node {
-  type: string;
-  start: number;
-  end: number;
-  [key: string]: unknown;
+/** Tagged templates written as JSX children (`{m`…`}`, `{display({ numbered: true })`…`}`): prose content, not code. */
+function proseTemplates(source: string, fileName: string): OxcNode[] | undefined {
+  const parsed = parseProse(source, fileName);
+  if (parsed.errors.length) return undefined;
+  const out: OxcNode[] = [];
+  walkAst<OxcNode>(parsed.program, (n, parent) => {
+    if (n.type === 'TaggedTemplateExpression' && parent?.type === 'JSXExpressionContainer') out.push(n);
+  });
+  return out;
 }
 
-/** Tagged templates written as JSX children (`{m`…`}`, `{mm({ freeze: true })`…`}`): prose content, not code. */
-function proseTemplates(source: string, fileName: string): Node[] | undefined {
-  const parsed = parseSync(fileName, source, { sourceType: 'module', lang: fileName.endsWith('.jsx') ? 'jsx' : 'tsx' });
-  if (parsed.errors.length) return undefined;
-  const out: Node[] = [];
-  const visit = (value: unknown, parent: Node | undefined): void => {
-    if (!value || typeof value !== 'object') return;
-    if (Array.isArray(value)) {
-      for (const v of value) visit(v, parent);
-      return;
-    }
-    const n = value as Node;
-    if (n.type === 'TaggedTemplateExpression' && parent?.type === 'JSXExpressionContainer') out.push(n);
-    for (const key of Object.keys(n)) {
-      if (key === 'type' || key === 'start' || key === 'end') continue;
-      const v = n[key];
-      if (v && typeof v === 'object') visit(v, n);
-    }
-  };
-  visit(parsed.program, undefined);
-  return out;
+/** What identifies a prose template across formatting: the tag's name (`m` in `m(…)`) and the template text. */
+function templateKey(node: OxcNode): string {
+  let tag = node.tag as OxcNode;
+  while (tag.type === 'CallExpression') tag = tag.callee as OxcNode;
+  const name = tag.type === 'Identifier' ? (tag.name as string) : tag.type;
+  const quasis = ((node.quasi as OxcNode).quasis as OxcNode[]).map((q) => (q.value as { raw: string }).raw);
+  return `${name}\0${toLf(quasis.join('\0'))}`;
 }
 
 /**
  * Put prose templates back as the author wrote them: a code formatter would lay out a long math template like a
- * call (`m({\n currentColor: true,\n })`…``). Matched by order; nothing is replaced if the counts differ.
+ * call (`m({\n color: true,\n })`…``). Matched by order; nothing is replaced unless every pair has the same
+ * tag name and template text.
  */
 function keepProseTemplates(original: string, formatted: string, fileName: string): string {
   const before = proseTemplates(original, fileName);
   const after = proseTemplates(formatted, fileName);
   if (!before || !after || before.length !== after.length || before.length === 0) return formatted;
+  if (before.some((node, i) => templateKey(node) !== templateKey(after[i]!))) return formatted;
   let out = '';
   let cursor = 0;
   after.forEach((node, i) => {
@@ -120,8 +112,8 @@ export async function formatAsync(source: string, fileName: string, options: Pip
   if (!pre) return format(source, fileName, options);
   // The whole pipeline runs on LF text; the file's line endings are restored at the end. (Handing CRLF text to a
   // code formatter with endOfLine "crlf" doubles the CR inside template literals.)
-  const crlf = source.includes('\r\n');
-  const lf = crlf ? source.replace(/\r\n/g, '\n') : source;
+  const eol = detectEol(source);
+  const lf = toLf(source);
   let input: string;
   try {
     const standard =
@@ -132,8 +124,7 @@ export async function formatAsync(source: string, fileName: string, options: Pip
   } catch (error) {
     return { code: source, changed: false, errors: [`preFormat failed: ${(error as Error).message}`] };
   }
-  input = keepProseTemplates(lf, input.replace(/\r*\n/g, '\n'), fileName);
-  if (crlf) input = input.replace(/\n/g, '\r\n');
+  input = restoreEol(keepProseTemplates(lf, toLf(input), fileName), eol);
   // The code formatter's output is standard JSX: read it as such, print it with the TSProse rules.
   const result = format(input, fileName, { ...options, input: 'jsx' });
   return { ...result, changed: result.code !== source };

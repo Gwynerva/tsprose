@@ -44,6 +44,18 @@ describe('ESLint plugin', () => {
     expect(messages.map((m) => m.ruleId)).toEqual(['tsprose/refs']);
   });
 
+  it('accepts a JSON tags description as settings', async () => {
+    const { describeTags } = await import('tsprose');
+    const description = JSON.parse(JSON.stringify(describeTags(manifest.tags)));
+    const messages = lint('const x = <P centre>text <Qed /></P>;', description) as Linter.LintMessage[];
+    expect(messages.map((m) => m.ruleId)).toEqual(['tsprose/valid-props', 'tsprose/valid-children']);
+  });
+
+  it('reports the package version', async () => {
+    const { createRequire } = await import('node:module');
+    expect(plugin.meta?.version).toBe(createRequire(import.meta.url)('../package.json').version);
+  });
+
   it('throws a clear error without settings', () => {
     const linter = new Linter({ configType: 'flat' });
     expect(() =>

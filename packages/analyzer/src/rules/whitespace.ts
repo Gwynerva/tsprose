@@ -1,5 +1,6 @@
 import { transform } from '@tsprose/transform';
-import { forEachJsxElement, rangeOf, type EsNode } from '../estree.js';
+import { classifyJsxChild, hasNewline, leadingWhitespace, trailingWhitespace } from '@tsprose/transform/tooling';
+import { forEachJsxContainer, rangeOf, type EsNode } from '../estree.js';
 import type { Finding, Manifest } from '../types.js';
 
 /**
@@ -25,23 +26,18 @@ export function checkWhitespace(program: EsNode, source: string, fileName: strin
     }
     return findings;
   }
-  forEachJsxElement(program, (element) => {
-    const children = (element.children as EsNode[]) ?? [];
+  forEachJsxContainer(program, (container) => {
+    const children = (container.children as EsNode[]) ?? [];
     children.forEach((child, i) => {
-      if (child.type !== 'JSXExpressionContainer') return;
-      const expr = child.expression as EsNode;
-      if (expr.type !== 'Literal' || expr.value !== ' ') return;
-      const prev = children[i - 1];
-      const next = children[i + 1];
-      const nl = (n: EsNode | undefined, edge: 'start' | 'end') => {
+      if (classifyJsxChild(child, source).kind !== 'space') return;
+      // A line break at the edge of the neighbouring text already separates the content.
+      const brokenAt = (n: EsNode | undefined, edge: 'start' | 'end') => {
         if (!n || n.type !== 'JSXText') return false;
         const [s, e] = rangeOf(n);
         const text = source.slice(s, e);
-        const ws = edge === 'start' ? text.match(/^[ \t\r\n\f]*/)![0] : text.match(/[ \t\r\n\f]*$/)![0];
-        return /[\r\n]/.test(ws);
+        return hasNewline(edge === 'start' ? leadingWhitespace(text) : trailingWhitespace(text));
       };
-      // Safe to remove only when a line break already separates the neighbours.
-      const safe = nl(prev, 'end') || nl(next, 'start');
+      const safe = brokenAt(children[i - 1], 'end') || brokenAt(children[i + 1], 'start');
       const range = rangeOf(child);
       findings.push({
         code: 'whitespace/space-hack',

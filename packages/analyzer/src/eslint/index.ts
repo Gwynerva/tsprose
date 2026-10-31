@@ -1,3 +1,4 @@
+import { createRequire } from 'node:module';
 import type { ESLint, Linter, Rule } from 'eslint';
 import { analyzeProgram } from '../analyze.js';
 import type { EsNode } from '../estree.js';
@@ -17,14 +18,26 @@ import type { Finding, Manifest, RuleName } from '../types.js';
  * Any ESTree-JSX parser works (espree with `ecmaFeatures.jsx`, typescript-eslint for TSX).
  */
 
+/** Findings per AST: the five rules share one analysis per file. */
 const cache = new WeakMap<object, Finding[]>();
+/** Manifest per settings value: a JSON description is converted once, not once per rule and file. */
+const manifests = new WeakMap<object, Manifest>();
+
+function manifestFor(setting: Manifest | TagsDescription): Manifest {
+  let manifest = manifests.get(setting);
+  if (!manifest) {
+    manifest = toManifest(setting, { wrapsLooseInline: true, transform: true });
+    manifests.set(setting, manifest);
+  }
+  return manifest;
+}
 
 function findingsFor(context: Rule.RuleContext, rule: RuleName): Finding[] {
   const setting = (context.settings as { tsprose?: Manifest | TagsDescription }).tsprose;
-  const manifest = setting ? toManifest(setting, { wrapsLooseInline: true, transform: true }) : undefined;
-  if (!manifest) {
-    throw new Error('@tsprose/analyzer: settings.tsprose (a Manifest) is required');
+  if (!setting || typeof setting !== 'object') {
+    throw new Error('@tsprose/analyzer: settings.tsprose (a Manifest or a JSON tags description) is required');
   }
+  const manifest = manifestFor(setting);
   const ast = context.sourceCode.ast as unknown as EsNode;
   let all = cache.get(ast);
   if (!all) {
@@ -64,8 +77,11 @@ const rules: Record<string, Rule.RuleModule> = {
   braces: makeRule('braces', 'LaTeX braces written in JSX text become JSX expressions (\\sqrt{20} renders as \\sqrt20)'),
 };
 
+// src/eslint and dist/eslint are both two levels below the package root.
+const { version } = createRequire(import.meta.url)('../../package.json') as { version: string };
+
 const plugin: ESLint.Plugin & { configs: { recommended: Linter.Config } } = {
-  meta: { name: '@tsprose/analyzer', version: '2.0.0-alpha.0' },
+  meta: { name: '@tsprose/analyzer', version },
   rules,
   configs: {
     recommended: {

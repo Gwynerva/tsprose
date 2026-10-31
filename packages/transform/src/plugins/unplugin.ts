@@ -23,7 +23,8 @@ export const tsprose: UnpluginInstance<PluginOptions | undefined, false> = creat
   transform(code, id) {
     if (!mayContainJsx(code)) return null;
     const result = transform(code, id.split('?')[0]!, options);
-    if (result.code === code) return null;
+    // Parse errors: leave the file alone so the bundler reports them on the original source.
+    if (result.errors.length || result.code === code) return null;
     return { code: result.code, map: result.map };
   },
 }));

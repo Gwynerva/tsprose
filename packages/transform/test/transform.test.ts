@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { transform as esbuildTransform } from 'esbuild';
-import { transform } from '../src/transform.js';
-import { shouldTransform } from '../src/plugins/unplugin.js';
+import { mayContainJsx, transform } from '../src/transform.js';
+import { shouldTransform, tsprose } from '../src/plugins/unplugin.js';
 import { withTSProse, transformSource } from '../src/plugins/jiti.js';
 
 const t = (code: string) => transform(code, 'doc.tsx');
@@ -177,5 +177,57 @@ describe('paragraphs and comments', () => {
     const r = transform(src, 'a.tsx', { paragraphs: true });
     expect(r.code).toBe('const x = <Sec>\n  end of paragraph.\n\n  {"\\u2029"}{/* TODO */}\n  next paragraph\n</Sec>;');
     expect(transform(r.code, 'a.tsx', { paragraphs: true }).code).toBe(r.code);
+  });
+});
+
+describe('positions: type arguments, hashbang and directives', () => {
+  it('puts __tsprosePos after type arguments', () => {
+    const r = transform('const x = <List<Item> items={a}>x</List>;', 'a.tsx', { positions: true, sourceMap: false });
+    expect(r.code).toContain('<List<Item> __tsprosePos={[__tsproseFile, 1, 11]} items={a}>');
+    expect(r.errors).toEqual([]);
+  });
+
+  it('declares __tsproseFile after the hashbang and the directive prologue', () => {
+    const src = "#!/usr/bin/env bun\n'use client';\n\"use strict\";\nconst x = <P>a</P>;";
+    const r = transform(src, 'a.tsx', { positions: true, sourceMap: false });
+    expect(r.code.startsWith("#!/usr/bin/env bun\n'use client';\n\"use strict\";\nconst __tsproseFile = \"a.tsx\";\n")).toBe(true);
+    expect(transform(r.code, 'a.tsx', { positions: true }).code).toBe(r.code);
+  });
+
+  it('declares __tsproseFile first without a prologue', () => {
+    const r = transform("import { P } from './p';\nconst x = <P>a</P>;", 'a.tsx', { positions: true, sourceMap: false });
+    expect(r.code.startsWith('const __tsproseFile = "a.tsx";\nimport')).toBe(true);
+  });
+});
+
+describe('plugins leave files with parse errors alone', () => {
+  const broken = 'const x = <P>\n  a\n  <B>b</B>\n</P>;\nconst y = <Q>unclosed;';
+
+  it('transform still reports the errors', () => {
+    expect(transform(broken, 'doc.tsx').errors.length).toBeGreaterThan(0);
+  });
+
+  it('transformSource and withTSProse return the source unchanged', () => {
+    expect(transformSource(broken, '/doc.tsx')).toBe(broken);
+    let seen: string | undefined;
+    withTSProse((opts: { source: string; filename?: string }) => (seen = opts.source))({ source: broken, filename: '/doc.tsx' });
+    expect(seen).toBe(broken);
+  });
+
+  it('the unplugin transform returns null', () => {
+    const hooks = tsprose.raw(undefined, { framework: 'vite' }) as { transform: (code: string, id: string) => unknown };
+    expect(hooks.transform(broken, '/doc.tsx')).toBeNull();
+    expect(hooks.transform('const x = <P>\n  a\n  <B>b</B>\n</P>;', '/doc.tsx')).not.toBeNull();
+  });
+});
+
+describe('mayContainJsx', () => {
+  it.each([
+    ['const x = <P>a</P>;', true],
+    ['const x = <>a</>;', true],
+    ['const x = a < 1;', false],
+    ['const x = 1;', false],
+  ])('%s → %s', (source, expected) => {
+    expect(mayContainJsx(source)).toBe(expected);
   });
 });

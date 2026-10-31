@@ -1,8 +1,8 @@
 // Report mode: how many spaces the TSProse rule would insert in a content tree, without writing.
 // Usage: bun scripts/report.ts <dir> [--show]
-import { readdir, readFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { readFile } from 'node:fs/promises';
 import { transform } from '../src/transform.js';
+import { walkProseFiles } from '../src/tooling.js';
 
 const dir = process.argv[2];
 const show = process.argv.includes('--show');
@@ -11,21 +11,12 @@ if (!dir) {
   process.exit(1);
 }
 
-async function* files(root: string): AsyncGenerator<string> {
-  for (const entry of await readdir(root, { withFileTypes: true })) {
-    if (entry.name === 'node_modules' || entry.name.startsWith('.')) continue;
-    const full = join(root, entry.name);
-    if (entry.isDirectory()) yield* files(full);
-    else if (/\.(tsx|jsx)$/.test(entry.name)) yield full;
-  }
-}
-
 let totalFiles = 0;
 let touched = 0;
 let total = 0;
 let textual = 0;
 const started = performance.now();
-for await (const file of files(dir)) {
+for await (const file of walkProseFiles(dir)) {
   totalFiles++;
   const source = await readFile(file, 'utf8');
   const result = transform(source, file);
@@ -37,7 +28,7 @@ for await (const file of files(dir)) {
   textual += t;
   console.log(`${result.insertions.length.toString().padStart(4)} (${t.toString().padStart(3)} text)  ${file}`);
   if (show) {
-    const lines = source.split(/\r?\n/);
+    const lines = source.split(/\r\n|\r|\n/);
     for (const ins of result.insertions.filter((i) => i.between === 'text').slice(0, 40)) {
       const before = (lines[ins.line - 2] ?? '').trim();
       const line = lines[ins.line - 1] ?? '';
