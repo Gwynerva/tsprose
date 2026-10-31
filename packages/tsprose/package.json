@@ -4,6 +4,16 @@
   "type": "module",
   "description": "Write and structure prose in TypeScript TSX with strong typing: schema-first tags, typed documents, cross references and a compile pipeline.",
   "license": "MIT",
+  "author": "Gwynerva <the.gwynerva@gmail.com>",
+  "homepage": "https://github.com/Gwynerva/tsprose/tree/v2/packages/tsprose#readme",
+  "bugs": {
+    "url": "https://github.com/Gwynerva/tsprose/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Gwynerva/tsprose.git",
+    "directory": "packages/tsprose"
+  },
   "keywords": [
     "prose",
     "typescript",
@@ -11,16 +21,21 @@
     "jsx",
     "markup",
     "document",
-    "crossref"
+    "crossref",
+    "cross-reference",
+    "transclusion",
+    "schema"
   ],
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/Gwynerva/tsprose.git"
+  "engines": {
+    "node": ">=20"
   },
   "sideEffects": false,
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "LICENSE"
   ],
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -48,10 +63,14 @@
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "build": "rm -rf dist && tsc -p tsconfig.build.json && cp src/externals.d.ts dist/externals.d.ts && cp src/jsx-global.d.ts dist/jsx-global.d.ts",
-    "test": "vitest run"
+    "build": "node ../../scripts/build-package.mjs --copy src/externals.d.ts --copy src/jsx-global.d.ts",
+    "test": "vitest run --config vitest.config.ts && vitest run --config vitest.registry.config.ts",
+    "prepublishOnly": "bun run build"
   },
   "dependencies": {
     "@noble/hashes": "^2.0.0"
+  },
+  "devDependencies": {
+    "@typescript/typescript6": "^6.0.2"
   }
 }

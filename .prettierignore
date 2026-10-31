@@ -1,0 +1,7 @@
+bun.lock
+dist
+node_modules
+packages/testbed/content
+packages/testbed/content-broken
+packages/testbed/generated
+*.vsix
