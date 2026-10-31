@@ -25,5 +25,23 @@ import { withTSProse } from '@tsprose/transform/jiti';    // createJiti(root, { 
 import { transform } from '@tsprose/transform';            // transform(source, fileName, options) → { code, map, insertions }
 ```
 
-`bun scripts/report.ts <dir>` reports what the rule would change in an existing content tree without writing anything.
-On the Open Math corpus it found 43 text-adjacent breaks, among them a known live bug and five more silently glued words.
+Files with syntax errors are returned unchanged by every plugin (the compiler reports the error itself).
+
+`bun scripts/report.ts <dir>` reports what the rule would change in an existing content tree without writing anything —
+useful when migrating content written for plain JSX (on one real 70-article corpus it found 43 silently glued words).
+
+### `@tsprose/transform/tooling`
+
+Shared helpers for TSProse tools (used by `@tsprose/fmt`, `@tsprose/analyzer` and the editor extension): `parseProse`,
+`walkAst`, `jsxName`, `classifyJsxChild` (text, explicit space, glue, paragraph break, comment, expression…), whitespace
+and line-ending helpers (`detectEol`, `toLf`, `restoreEol`, `positionOf`), `walkProseFiles` and `loadTsproseConfig` —
+the one `tsprose.config.ts` schema all tools read:
+
+```ts
+// tsprose.config.ts
+export default {
+  manifest: './tsprose.manifest.json', // describeTags() output (or `tags: { JSXName: Tag }` + `inlineComponents`)
+  printWidth: 120,                      // formatter options: indent, preFormat, separateBlocks, compactContainers, blockCalls…
+  mathTags: ['M', 'BlockMath'],         // analyzer: tags whose text is LaTeX
+};
+```

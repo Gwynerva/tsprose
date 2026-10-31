@@ -4,9 +4,33 @@
   "type": "module",
   "description": "Fast prose-aware formatter for TSProse TSX files: fills text by width, never breaks inline elements from their punctuation, keeps code outside JSX untouched.",
   "license": "MIT",
+  "author": "Gwynerva <the.gwynerva@gmail.com>",
+  "homepage": "https://github.com/Gwynerva/tsprose/tree/v2/packages/fmt#readme",
+  "bugs": {
+    "url": "https://github.com/Gwynerva/tsprose/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Gwynerva/tsprose.git",
+    "directory": "packages/fmt"
+  },
+  "keywords": [
+    "tsprose",
+    "formatter",
+    "prose",
+    "tsx",
+    "jsx",
+    "cli"
+  ],
+  "engines": {
+    "node": ">=20",
+    "bun": ">=1.2"
+  },
   "sideEffects": false,
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "LICENSE"
   ],
   "bin": {
     "tsprose-fmt": "./dist/cli.js"
@@ -20,25 +44,25 @@
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "build": "node ../../scripts/build-package.mjs",
     "test": "vitest run",
-    "bench": "bun test/bench.ts"
+    "bench": "bun test/bench.ts",
+    "prepublishOnly": "bun run build"
   },
   "dependencies": {
     "oxc-parser": "^0.156.0",
-    "@tsprose/transform": "workspace:*"
+    "@tsprose/transform": "workspace:^"
   },
   "peerDependencies": {
-    "tsprose": "workspace:*",
     "oxfmt": ">=0.75.0"
-  },
-  "devDependencies": {
-    "oxfmt": "0.75.0",
-    "tsprose": "workspace:*"
   },
   "peerDependenciesMeta": {
     "oxfmt": {
       "optional": true
     }
+  },
+  "devDependencies": {
+    "oxfmt": "0.75.0",
+    "tsprose": "workspace:^"
   }
 }

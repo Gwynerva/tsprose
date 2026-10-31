@@ -15,9 +15,13 @@ A narrow, fast formatter for TSProse prose files. It re-prints JSX regions only;
 
 ```bash
 tsprose-fmt content/ --config tsprose.config.ts      # format in place
-tsprose-fmt content/ --check                          # CI
+tsprose-fmt content/ --check                          # CI: exit 1 when a file needs formatting
 tsprose-fmt --stdin --stdin-filepath doc.tsx          # editors
+tsprose-fmt --help
 ```
+
+Exit codes: `0` success, `1` files need formatting (`--check`), `2` usage errors, missing paths or a broken config.
+The CLI runs on Bun (`#!/usr/bin/env bun`).
 
 **Code outside the prose and attribute values** are left to a regular code formatter run first, through `preFormat`:
 `'oxfmt'` (optional dependency, ~40 ms on a 3 400-line article), `{ oxfmt: { singleQuote: true } }`, or any function
@@ -26,9 +30,9 @@ source mean the same in standard JSX (`{" "}` for line breaks, `{"\u2029"}` for 
 nothing about TSProse cannot glue words or merge paragraphs; the prose pass turns the markers back. `refFirst: true`
 prints the `$` attribute first.
 
-The config module exports `{ manifest }` (a JSON tags description from tsprose `describeTags`, or a path to one — the
+The config is the shared `tsprose.config.ts` (see `@tsprose/transform/tooling`; conflicting keys are reported). It exports `{ manifest }` (a JSON tags description from tsprose `describeTags`, or a path to one — the
 recommended way: member tags, inline containers and block templates come from the tags themselves), `{ tags }`, or
 `{ inlineTags, blockTags, inlineContainers }`, plus `printWidth`, `indent`, `transform`
 `separateBlocks` (one blank line between all block items at every depth; `compactContainers` lists exceptions such as
 `Table`/`List`) and `blockCalls` (names of functions whose calls produce blocks, e.g. `['mm']` for `{mm\`…\`}`, laid out on their own line).
-On the largest Open Math article (3 385 lines) it runs in ~20 ms warm and is idempotent. `bun test/bench.ts [file]` measures it.
+On a 3 400-line article it runs in ~20 ms warm and is idempotent. `bun test/bench.ts <file>` measures it.

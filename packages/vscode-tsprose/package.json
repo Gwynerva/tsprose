@@ -1,22 +1,38 @@
 {
   "name": "vscode-tsprose",
-  "displayName": "TSProse",
-  "description": "Format TSProse prose files with @tsprose/fmt (fast, prose-aware) instead of Prettier.",
   "version": "0.1.1",
   "private": true,
-  "publisher": "tsprose",
+  "description": "Format TSProse prose files with @tsprose/fmt (fast, prose-aware) instead of Prettier.",
   "license": "MIT",
+  "author": "Gwynerva <the.gwynerva@gmail.com>",
+  "homepage": "https://github.com/Gwynerva/tsprose/tree/v2/packages/vscode-tsprose#readme",
+  "bugs": {
+    "url": "https://github.com/Gwynerva/tsprose/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Gwynerva/tsprose.git",
+    "directory": "packages/vscode-tsprose"
+  },
+  "keywords": [
+    "tsprose",
+    "formatter",
+    "prose",
+    "tsx"
+  ],
   "engines": {
     "vscode": "^1.90.0"
   },
+  "publisher": "tsprose",
+  "displayName": "TSProse",
   "categories": [
     "Formatters"
   ],
+  "main": "./dist/extension.js",
   "activationEvents": [
     "onLanguage:typescriptreact",
     "onLanguage:javascriptreact"
   ],
-  "main": "./dist/extension.js",
   "contributes": {
     "configuration": {
       "title": "TSProse",
@@ -29,12 +45,12 @@
         "tsprose.fmt.config": {
           "type": "string",
           "default": "",
-          "description": "Path to the formatter config module (relative to the workspace folder). Empty: no config."
+          "description": "Path to the formatter config (tsprose.config.ts or a JSON tags description): absolute, or relative to the workspace folder (to the document's folder outside a workspace). Empty: no config."
         },
         "tsprose.fmt.files": {
           "type": "string",
           "default": "**/content/**/*.tsx",
-          "description": "Glob (relative to the workspace) of prose files the formatter handles. Other TSX files are left to your default formatter."
+          "description": "Glob (relative to the workspace folder; matched against the full path outside a workspace) of prose files the formatter handles. The default follows the convention of keeping prose under a content/ folder. Other TSX files are left to your default formatter."
         }
       }
     }
@@ -46,6 +62,8 @@
     "package": "vsce package"
   },
   "devDependencies": {
-    "@types/vscode": "~1.90.0"
+    "@types/vscode": "~1.90.0",
+    "@vscode/vsce": "^3.6.0",
+    "esbuild": "^0.28.2"
   }
 }

@@ -4,27 +4,58 @@
   "type": "module",
   "description": "Source transform for TSProse prose files: a line break between inline content is a space (TeX rule). Plugins for Vite, Rollup, esbuild, webpack, Bun and jiti.",
   "license": "MIT",
+  "author": "Gwynerva <the.gwynerva@gmail.com>",
+  "homepage": "https://github.com/Gwynerva/tsprose/tree/v2/packages/transform#readme",
+  "bugs": {
+    "url": "https://github.com/Gwynerva/tsprose/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Gwynerva/tsprose.git",
+    "directory": "packages/transform"
+  },
+  "keywords": [
+    "tsprose",
+    "jsx",
+    "tsx",
+    "whitespace",
+    "transform",
+    "vite-plugin",
+    "unplugin",
+    "bun-plugin"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
   "sideEffects": false,
-  "files": ["dist"],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./tooling": {
+      "types": "./dist/tooling.d.ts",
+      "default": "./dist/tooling.js"
+    },
     "./vite": {
-      "types": "./dist/plugins/unplugin.d.ts",
+      "types": "./dist/plugins/vite.d.ts",
       "default": "./dist/plugins/vite.js"
     },
     "./rollup": {
-      "types": "./dist/plugins/unplugin.d.ts",
+      "types": "./dist/plugins/rollup.d.ts",
       "default": "./dist/plugins/rollup.js"
     },
     "./esbuild": {
-      "types": "./dist/plugins/unplugin.d.ts",
+      "types": "./dist/plugins/esbuild.d.ts",
       "default": "./dist/plugins/esbuild.js"
     },
     "./webpack": {
-      "types": "./dist/plugins/unplugin.d.ts",
+      "types": "./dist/plugins/webpack.d.ts",
       "default": "./dist/plugins/webpack.js"
     },
     "./bun": {
@@ -39,9 +70,10 @@
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "build": "node ../../scripts/build-package.mjs",
     "test": "vitest run",
-    "report": "bun scripts/report.ts"
+    "report": "bun scripts/report.ts",
+    "prepublishOnly": "bun run build"
   },
   "dependencies": {
     "magic-string": "^1.4.5",

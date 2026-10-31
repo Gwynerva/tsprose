@@ -2,9 +2,11 @@
 
 A tiny VS Code extension that formats TSProse prose files with `@tsprose/fmt` on save.
 
-- `tsprose.fmt.files` — glob of prose files (default `**/content/**/*.tsx`); other TSX files are left to your default formatter.
+- `tsprose.fmt.files` — glob of prose files, relative to the workspace folder (default `**/content/**/*.tsx`, a common
+  layout; set it to match yours); other TSX files are left to your default formatter.
 - `tsprose.fmt.command` — how to run the formatter (default `bunx tsprose-fmt`).
-- `tsprose.fmt.config` — formatter config module (tag kinds, print width).
+- `tsprose.fmt.config` — the `tsprose.config.ts` module, relative to the workspace folder (or to the file's folder when
+  the file is outside any workspace).
 
 Workspace settings example:
 
@@ -15,4 +17,5 @@ Workspace settings example:
 }
 ```
 
-Build: `bun run build` (esbuild bundle), package: `bun run package` (needs `vsce`).
+Build: `bun run build` (esbuild bundle), package: `bun run package` (`@vscode/vsce`). Output and errors are shown in the
+"TSProse" output channel.

@@ -9,12 +9,18 @@ Rules
 - `props` — unknown props, props fixed by a preset, missing `$` on `ref: 'required'`, `$` on `ref: 'none'`.
 - `refs` — handles from `defineRefs` in the same file must be used exactly once.
 - `whitespace` — without the transform: line breaks that drop a space (autofix inserts `{' '}`); with it: redundant `{' '}` hacks.
+- `braces` — LaTeX in JSX text glued to a `{…}` expression (`<M>\sqrt{20}</M>` renders `\sqrt20`): write math in a template instead.
 
 Surfaces
 
 ```bash
-tsprose check content/ --config tsprose.config.ts [--fix] [--json]
+tsprose check content/ --config tsprose.config.ts [--fix] [--json] [--rules children,props]
 ```
+
+Exit codes: `0` no errors, `1` errors found (including files that do not parse), `2` usage errors, missing paths or a
+broken config. `--fix` applies autofixes until nothing is left to fix and reports what remains; files with syntax errors
+are never fixed. The config is the shared `tsprose.config.ts` (see `@tsprose/transform/tooling`): with `manifest`,
+`wrapsLooseInline` and `transform` default to `true`; `mathTags` limits the `braces` rule to LaTeX tags. The CLI runs on Bun.
 
 ```js
 // eslint.config.js
