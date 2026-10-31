@@ -26,7 +26,7 @@ export interface ChildrenRule {
   /** DTD-like content model over child type names, see `pattern.ts`. */
   readonly pattern?: string;
   /**
-   * Occurrence limits per child type, in any order: `{ problemDescription: 1, problemAnswer: [0, 1] }`.
+   * Occurrence limits per child type, in any order: `{ caption: [0, 1], body: 1 }`.
    * A number means "exactly", a pair `[min, max]` a range (`max` may be `Infinity`). Types not listed are unlimited.
    * The order-free complement of `pattern` (which is a sequence).
    */
@@ -46,7 +46,7 @@ export type ReportFn = (code: string, message: string, severity?: Severity) => v
 export interface DataContext<P extends PropsInput, C extends ChildrenSpec> {
   readonly props: PropsOf<P>;
   readonly children: ChildNodes<C>;
-  /** Report a problem instead of throwing: `report('problem/two-answers', 'Only one <ProblemAnswer> is allowed')`. */
+  /** Report a problem instead of throwing: `report('figure/two-captions', 'Only one <Caption> is allowed')`. */
   readonly report: ReportFn;
   /** Scratch object shared with `normalize` for this element (e.g. extra results of generating the children). */
   readonly state: Record<string, unknown>;
@@ -168,7 +168,6 @@ const ruleCache = new WeakMap<BaseDef, ResolvedChildrenRule>();
 export function isChildrenRule(spec: ChildrenSpec): spec is ChildrenRule {
   return typeof spec === 'object' && spec !== null && !Array.isArray(spec);
 }
-const isRuleObject = isChildrenRule;
 
 /** Resolve (and cache) the runtime children rule of a definition. Lazy tag lists are called once. */
 export function resolveChildrenRule(def: BaseDef): ResolvedChildrenRule {
@@ -187,7 +186,7 @@ export function resolveChildrenRule(def: BaseDef): ResolvedChildrenRule {
     ruleCache.set(def, rule);
     return rule;
   }
-  if (isRuleObject(spec)) {
+  if (isChildrenRule(spec)) {
     of = spec.of;
     min = spec.min;
     max = spec.max;
@@ -227,7 +226,7 @@ export function resolveChildrenRule(def: BaseDef): ResolvedChildrenRule {
     rule = { mode: 'tags', tags, ...arity, pattern, context };
   }
 
-  if (isRuleObject(spec) && spec.whitespace === 'preserve') rule = { ...rule, preserveWhitespace: true };
+  if (isChildrenRule(spec) && spec.whitespace === 'preserve') rule = { ...rule, preserveWhitespace: true };
 
   if (counts) {
     rule = { ...rule, counts };

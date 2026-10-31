@@ -14,7 +14,7 @@ export interface RegistryTypesOptions {
 
 /**
  * Declaration text that augments {@link CorpusRegistry} with documents, their element names and tag names, so
- * `ref('dem/1234', 'solution')` is checked and completed by the editor. Entries can come from anywhere:
+ * `ref('guide/intro', 'install')` is checked and completed by the editor. Entries can come from anywhere:
  * `index.registryEntries()` after a build, {@link registryEntriesFromCorpus} without compiling, a database, a manifest.
  * Write the result to a `.d.ts` file included by the project's tsconfig.
  */

@@ -37,3 +37,6 @@ export async function runPool<T>(
   const width = Math.max(1, Math.min(limit ?? 8, items.length));
   await Promise.all(Array.from({ length: width }, worker));
 }
+
+/** Tag and pattern names: a letter or `_`, then word characters, `.` or `-` (source, without anchors). */
+export const TAG_NAME_SOURCE = String.raw`[A-Za-z_][\w.-]*`;

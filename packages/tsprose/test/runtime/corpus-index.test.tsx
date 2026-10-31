@@ -1,27 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import {
-  Corpus,
-  CorpusIndex,
-  Include,
-  addressKey,
-  compile,
-  compileCorpus,
-  defineBlock,
-  defineDocument,
-  defineInline,
-  defineRefs,
-  deriveJSON,
-  generateRegistryTypes,
-  parseAddress,
-  ref,
-  refMetaOf,
-  refPropsOfProps,
-  refSchema,
-  registryEntriesFromCorpus,
-  s,
-  toJSON,
-  type BaseNode,
-} from 'tsprose';
+import { Corpus, CorpusIndex, Include, addressKey, compile, compileCorpus, defineBlock, defineDocument, defineInline, defineRefs, deriveJSON, generateRegistryTypes, parseAddress, ref, refSchema, registryEntriesFromCorpus, s, toJSON, type BaseNode } from 'tsprose';
+import { refMetaOf, refPropsOfProps } from 'tsprose/internal';
 import { P, Theorem } from '../fixtures/tags.js';
 
 const codes = (ds: readonly { code: string }[]) => ds.map((d) => d.code);

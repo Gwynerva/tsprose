@@ -367,7 +367,7 @@ export function validateProps(
     return {
       value: given,
       issues: r.issues.map((issue) => {
-        const path = issue.path?.map((p) => (typeof p === 'object' ? String(p.key) : String(p))).join('.');
+        const path = formatIssuePath(issue);
         const key = path?.split('.')[0] ?? '';
         return { key, message: path ? `${path}: ${issue.message}` : issue.message };
       }),
@@ -380,7 +380,7 @@ export function validateProps(
     const r = runSync(record[key]!, input[key]);
     if (r.issues) {
       for (const issue of r.issues) {
-        const path = issue.path?.map((p) => (typeof p === 'object' ? String(p.key) : String(p))).join('.');
+        const path = formatIssuePath(issue);
         issues.push({ key, message: path ? `${key}.${path}: ${issue.message}` : `${key}: ${issue.message}` });
       }
     } else if (r.value !== undefined) {
@@ -393,4 +393,9 @@ export function validateProps(
     }
   }
   return { value, issues };
+}
+
+/** Dotted path of a Standard Schema issue (`a.0.b`), or undefined for a root issue. */
+function formatIssuePath(issue: StandardSchemaV1.Issue): string | undefined {
+  return issue.path?.map((p) => (typeof p === 'object' ? String(p.key) : String(p))).join('.');
 }

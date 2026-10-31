@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { defineBlock, defineInline, defineRefs, isTag, s, getRefHandle, type BaseNode, REF } from 'tsprose';
+import { defineBlock, defineInline, defineRefs, isTag, s, type BaseNode } from 'tsprose';
+import { getRefHandle, REF } from 'tsprose/internal';
 import { B, H1, H2, Heading, Image, P, Qed, Theorem, Details } from '../fixtures/tags.js';
 
 const codes = (node: BaseNode) => (node.diagnostics ?? []).map((d) => d.code);

@@ -15,6 +15,7 @@ import type { KitRuntime } from './kit.js';
 import type { Node } from './node.js';
 import type { Ref, RefTarget } from './ref.js';
 import type { DistributiveOmit, InferProps, PropsInput, PropsOf, PropsSpec } from './standard.js';
+import { TAG_NAME_SOURCE } from './util.js';
 
 export const TAG: unique symbol = Symbol.for('tsprose.tag');
 
@@ -263,7 +264,7 @@ export function createTag(def: BaseDef, kit: KitRuntime | undefined, preset?: Re
   return tag;
 }
 
-const NAME_RE = /^[A-Za-z_][\w.-]*$/;
+const NAME_RE = new RegExp(`^${TAG_NAME_SOURCE}$`);
 
 export function normalizeDef(input: Record<string, unknown>, kind: Kind): BaseDef {
   const name = input.name;

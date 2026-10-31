@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { type BaseNode, isTag, isTextNode, createElement } from 'tsprose';
+import { type BaseNode, isTag, isTextNode } from 'tsprose';
+import { createElement } from 'tsprose/internal';
 import { KB, KCallout, KDetails, KHr, kit } from '../fixtures/kit.js';
 import { B, Qed, P } from '../fixtures/tags.js';
 

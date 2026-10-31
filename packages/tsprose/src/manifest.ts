@@ -9,7 +9,7 @@ import { isTag, isTextTemplate, type AnyTag } from './tag.js';
  */
 export interface TagsDescription {
   readonly version: 1;
-  /** JSX name as written in prose files (`P`, `Problem.Hint`, `m`) → description. */
+  /** JSX name as written in prose files (`P`, `Figure.Caption`, `m`) → description. */
   readonly tags: Readonly<Record<string, TagDescription>>;
 }
 
@@ -60,7 +60,7 @@ function carriesDef(value: unknown): value is DefCarrierLike {
 
 /**
  * Flatten a map of JSX names to tags, including member tags attached to them
- * (`Object.assign(Problem, { Hint })` → `Problem.Hint`). Only values carrying a tag definition are kept:
+ * (`Object.assign(Figure, { Caption })` → `Figure.Caption`). Only values carrying a tag definition are kept:
  * tags, `Tag.template()` functions and components with a `def`.
  */
 export function collectTags(entries: Readonly<Record<string, unknown>>): Record<string, DefCarrierLike> {

@@ -13,6 +13,7 @@ export interface WalkContext {
   readonly path: readonly string[];
 }
 
+/** Returned by a visitor: `'skip'` skips the node's children, `'stop'` ends the walk. */
 export type WalkSignal = void | 'skip' | 'stop';
 
 export interface Visitor {
@@ -115,9 +116,7 @@ export function select<T extends AnyTag>(root: AnyNode, tag: T): NodeOf<T>[] {
 export function copyData<T>(value: T): T {
   if (Array.isArray(value)) return value.map(copyData) as T;
   if (value && typeof value === 'object') {
-    if (isRef(value) || isAddressable(value)) return value;
-    const proto = Object.getPrototypeOf(value);
-    if (proto !== Object.prototype && proto !== null) return value;
+    if (isRef(value) || isAddressable(value) || !isPlainObject(value)) return value;
     const out: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(value as Record<string, unknown>)) out[k] = copyData(v);
     return out as T;
@@ -148,7 +147,7 @@ export interface TreeIndex {
 }
 
 /** Build parent pointers and id/type lookups for a tree. */
-export function createIndex(root: AnyNode): TreeIndex {
+export function indexTree(root: AnyNode): TreeIndex {
   const parents = new WeakMap<AnyNode, BaseNode>();
   const byId = new Map<string, BaseNode>();
   const byType = new Map<string, BaseNode[]>();

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { flattenChildren, normalizeWhitespace, isTextNode, type AnyNode, type BaseNode } from 'tsprose';
+import { flattenChildren, isTextNode, type AnyNode, type BaseNode } from 'tsprose';
+import { normalizeWhitespace } from 'tsprose/internal';
 import { B, P, Proof, Qed, Sec, Theorem, Td, Tr, Table, M } from '../fixtures/tags.js';
 
 const texts = (nodes: AnyNode[] | undefined) =>

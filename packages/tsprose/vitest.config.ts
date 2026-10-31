@@ -15,6 +15,7 @@ export default defineConfig({
     alias: {
       'tsprose/jsx-dev-runtime': new URL('./src/jsx-dev-runtime.ts', import.meta.url).pathname,
       'tsprose/jsx-runtime': new URL('./src/jsx-runtime.ts', import.meta.url).pathname,
+      'tsprose/internal': new URL('./src/internal.ts', import.meta.url).pathname,
       tsprose: new URL('./src/index.ts', import.meta.url).pathname,
     },
   },

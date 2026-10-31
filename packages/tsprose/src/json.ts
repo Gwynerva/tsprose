@@ -89,6 +89,7 @@ function isEmptyObject(value: unknown): boolean {
   return typeof value === 'object' && value !== null && !Array.isArray(value) && Object.keys(value).length === 0;
 }
 
+/** Serialize one node (and its subtree): text as strings, references as `{ $ref }`, nested nodes as `{ $node }`. */
 export function nodeToJSON(node: AnyNode): JsonNode {
   if (isTextNode(node)) return node.text;
   const out: {
@@ -159,6 +160,7 @@ function restoreSlots(value: unknown, options: FromJSONOptions, bag: DiagnosticB
   return value;
 }
 
+/** Restore one node from JSON; with `options.prose` definitions are re-attached and props re-validated. */
 export function nodeFromJSON(json: JsonNode, options: FromJSONOptions = {}, bag = new DiagnosticBag()): AnyNode {
   if (typeof json === 'string') return { type: 'text', kind: 'inline', text: json };
   const node: BaseNode = {
@@ -183,6 +185,7 @@ export function nodeFromJSON(json: JsonNode, options: FromJSONOptions = {}, bag 
   return node;
 }
 
+/** Restore a serialized document (`toJSON` output): tree, ref → id map and derived values. */
 export function fromJSON(json: ProseJSON, options: FromJSONOptions = {}): FromJSONResult {
   if (json.v !== 2) throw new TypeError(`Unsupported prose JSON version ${String((json as { v: unknown }).v)}`);
   const bag = new DiagnosticBag();

@@ -1,3 +1,4 @@
+import { TAG_NAME_SOURCE } from './util.js';
 /**
  * Content model patterns — a tiny DTD-like grammar over child type names.
  *
@@ -23,7 +24,7 @@ type Token =
   | { kind: '|' }
   | { kind: 'q'; value: '?' | '*' | '+' };
 
-const NAME_RE = /^[A-Za-z_][\w.-]*/;
+const NAME_RE = new RegExp(`^${TAG_NAME_SOURCE}`);
 
 function tokenize(src: string): Token[] {
   const tokens: Token[] = [];

@@ -9,7 +9,7 @@ export const DOCUMENT: unique symbol = Symbol.for('tsprose.document');
 
 export interface DocumentOptions {
   /**
-   * Stable document id, when the document owns it (e.g. a problem number) instead of the integrator deriving
+   * Stable document id, when the document owns it (e.g. an exercise number) instead of the integrator deriving
    * it from a file path. `corpus.add(doc)` uses it; adding under another id is an error.
    */
   readonly id?: string | undefined;

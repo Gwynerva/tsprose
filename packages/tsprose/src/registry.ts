@@ -58,7 +58,6 @@ export type TagsToRegistry<Tags extends readonly AnyTag[]> = {
   [T in Tags[number] as T['def']['name']]: T;
 };
 
-export type RegisteredBaseDef = BaseDef;
 
 /** Explicit, registry-free prose instance. */
 export interface Prose<Tags extends readonly AnyTag[]> {
@@ -69,6 +68,7 @@ export interface Prose<Tags extends readonly AnyTag[]> {
   has(name: string): boolean;
 }
 
+/** A registry-free prose instance over an explicit tag list (typed node union, lookup by name for `fromJSON`). */
 export function createProse<const Tags extends readonly AnyTag[]>(options: { readonly tags: Tags }): Prose<Tags> {
   const byName = new Map<string, Tags[number]>();
   for (const tag of options.tags) {

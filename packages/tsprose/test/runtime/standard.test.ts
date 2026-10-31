@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { s, validateProps, runSync, compilePattern, hashText, canonicalJson, type Schema } from 'tsprose';
+import { s, hashText, canonicalJson, type Schema } from 'tsprose';
+import { validateProps, runSync, compilePattern } from 'tsprose/internal';
 
 describe('s (built-in schemas)', () => {
   it.each([

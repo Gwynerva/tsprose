@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   compile,
-  createIndex,
+  indexTree,
   createProse,
   find,
   findAll,
@@ -81,14 +81,14 @@ describe('walk', () => {
     expect(seen).toEqual(['section', 'paragraph', 'qed', 'paragraph']);
   });
 
-  it('find, findAll, select, createIndex', async () => {
+  it('find, findAll, select, indexTree', async () => {
     expect(label(find(tree, (n) => n.type === 'bold')!)).toBe('bold');
     expect(findAll(tree, (n) => n.type === 'paragraph')).toHaveLength(2);
     const paragraphs = select(tree, P);
     expect(paragraphs[0]!.data.center).toBe(false);
 
     const result = await compile(article);
-    const index = createIndex(result.root);
+    const index = indexTree(result.root);
     const thm = index.byId.get('pythagoras')!;
     expect(thm.type).toBe('theorem');
     expect(index.byType.get('paragraph')).toHaveLength(6);

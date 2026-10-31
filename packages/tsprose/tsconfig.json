@@ -6,7 +6,7 @@
     "jsx": "react-jsx",
     "jsxImportSource": "tsprose",
     "types": ["node"],
-    "paths": { "tsprose": ["./src/index.ts"], "tsprose/jsx-runtime": ["./src/jsx-runtime.ts"], "tsprose/jsx-dev-runtime": ["./src/jsx-dev-runtime.ts"] }
+    "paths": { "tsprose": ["./src/index.ts"], "tsprose/internal": ["./src/internal.ts"], "tsprose/jsx-runtime": ["./src/jsx-runtime.ts"], "tsprose/jsx-dev-runtime": ["./src/jsx-dev-runtime.ts"] }
   },
   "include": ["src", "test/fixtures", "test/runtime", "test/types"]
 }

@@ -264,18 +264,22 @@ export class CorpusIndex {
     return current;
   }
 
+  /** Whether a document (or an alias of one) is indexed. */
   has(id: string): boolean {
     return this.docs.has(this.canonicalId(id));
   }
 
+  /** The indexed document (aliases followed). */
   get(id: string): IndexedDocument | undefined {
     return this.docs.get(this.canonicalId(id));
   }
 
+  /** Ids of all indexed documents (virtual ones included). */
   ids(): string[] {
     return [...this.docs.keys()];
   }
 
+  /** All indexed documents. */
   documents(): IndexedDocument[] {
     return [...this.docs.values()];
   }
@@ -306,7 +310,7 @@ export class CorpusIndex {
 
   /**
    * References of a document — all of them, or only those inside one element (by its address name or element id):
-   * `index.outgoing('dem/1234', 'solution-2')`.
+   * `index.outgoing('guide/intro', 'install')`.
    */
   outgoing(id: string, within?: string): IndexedEdge[] {
     const doc = this.get(id);
@@ -317,7 +321,7 @@ export class CorpusIndex {
   }
 
   /**
-   * References pointing to a document (`'dem/1234'`) or to one element (`{ documentId, name }`), optionally of some
+   * References pointing to a document (`'guide/intro'`) or to one element (`{ documentId, name }`), optionally of some
    * kinds only. Aliases are followed on both sides.
    */
   incoming(to: string | Address, options: { readonly kinds?: readonly string[] } = {}): IndexedEdge[] {
