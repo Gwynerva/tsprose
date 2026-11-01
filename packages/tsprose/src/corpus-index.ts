@@ -2,7 +2,13 @@ import type { CompileResult } from './compile.js';
 import type { Diagnostic, Severity, SourcePos } from './diagnostics.js';
 import { nodeFromJSON, type ProseJSON } from './json.js';
 import { isTextNode, type BaseNode } from './node.js';
-import { addressKey, addressOf, isReferenceValue, type Address, type ReferenceValue } from './ref.js';
+import {
+  addressKey,
+  addressOf,
+  isReferenceValue,
+  type Address,
+  type ReferenceValue,
+} from './ref.js';
 import { compareStrings } from './util.js';
 import { forEachReference, walk } from './walk.js';
 
@@ -30,7 +36,8 @@ export interface CorpusIndexOptions {
    * Severity of references whose target is missing (default `'error'`). A function decides per edge: allow stubs
    * for not yet written documents, ignore external namespaces (`ext:…`), downgrade one kind to a warning, ….
    */
-  readonly dangling?: DanglingSeverity | ((edge: IndexedEdge) => DanglingSeverity) | undefined;
+  readonly dangling?:
+    DanglingSeverity | ((edge: IndexedEdge) => DanglingSeverity) | undefined;
   /** Name under which an element is addressable (default: its ref name `$`). Return undefined for "not addressable". */
   readonly name?: ((node: BaseNode) => string | undefined) | undefined;
 }
@@ -90,7 +97,9 @@ export interface ResolvedAddress {
   readonly target?: IndexedTarget | undefined;
 }
 
-export type ResolveFn = (value: Address | ReferenceValue) => ResolvedAddress | undefined;
+export type ResolveFn = (
+  value: Address | ReferenceValue,
+) => ResolvedAddress | undefined;
 
 /** One document's names and their tag names: input of `generateRegistryTypes`. */
 export interface RegistryEntry {
@@ -118,7 +127,11 @@ export interface CorpusIndexJSON {
 // Index
 //
 
-const RANK: Record<AffectedAction, number> = { revalidate: 0, rederive: 1, recompile: 2 };
+const RANK: Record<AffectedAction, number> = {
+  revalidate: 0,
+  rederive: 1,
+  recompile: 2,
+};
 
 /**
  * What a corpus contains: addressable elements of every document and the references between documents.
@@ -144,15 +157,34 @@ export class CorpusIndex {
   //
 
   /** Index a compiled document (replaces its previous entry). */
-  update(result: CompileResult, meta?: Readonly<Record<string, unknown>>): this {
+  update(
+    result: CompileResult,
+    meta?: Readonly<Record<string, unknown>>,
+  ): this {
     const id = result.documentId;
-    if (!id) throw new TypeError('CorpusIndex.update: the compile result has no document id');
+    if (!id)
+      throw new TypeError(
+        'CorpusIndex.update: the compile result has no document id',
+      );
     const edges: Omit<IndexedEdge, 'from'>[] = [];
     for (const o of result.outgoing) {
       if (!o.target) continue;
-      edges.push({ source: o.node.type, prop: o.prop, kind: o.kind, target: o.target, expects: o.expects, within: o.within, path: o.path, pos: o.node.pos });
+      edges.push({
+        source: o.node.type,
+        prop: o.prop,
+        kind: o.kind,
+        target: o.target,
+        expects: o.expects,
+        within: o.within,
+        path: o.path,
+        pos: o.node.pos,
+      });
     }
-    return this.set(id, { targets: collectTargets(result.root, this.options.name), edges, meta });
+    return this.set(id, {
+      targets: collectTargets(result.root, this.options.name),
+      edges,
+      meta,
+    });
   }
 
   /**
@@ -160,26 +192,57 @@ export class CorpusIndex {
    * in this process). Relation kinds and expected tags are not part of JSON: references are `link`s, transcluded
    * copies `include`s. Otherwise the entry matches what {@link update} produces for the same document.
    */
-  updateFromJSON(json: ProseJSON, meta?: Readonly<Record<string, unknown>>): this {
+  updateFromJSON(
+    json: ProseJSON,
+    meta?: Readonly<Record<string, unknown>>,
+  ): this {
     const id = json.documentId;
-    if (!id) throw new TypeError('CorpusIndex.updateFromJSON: the JSON has no document id');
+    if (!id)
+      throw new TypeError(
+        'CorpusIndex.updateFromJSON: the JSON has no document id',
+      );
     const root = nodeFromJSON(json.root) as BaseNode;
     const edges: Omit<IndexedEdge, 'from'>[] = [];
     walk(root, (node, ctx) => {
       if (isTextNode(node)) return;
-      const within = [...ctx.ancestors, node].map((n) => n.id).filter((x): x is string => x !== undefined);
+      const within = [...ctx.ancestors, node]
+        .map((n) => n.id)
+        .filter((x): x is string => x !== undefined);
       const path = [...ctx.path];
-      const from = node.meta.includedFrom as { documentId?: string; name?: string } | undefined;
+      const from = node.meta.includedFrom as
+        { documentId?: string; name?: string } | undefined;
       if (from?.documentId) {
-        const target: Address = from.name !== undefined ? { documentId: from.documentId, name: from.name } : { documentId: from.documentId };
-        edges.push({ source: node.type, prop: 'of', kind: 'include', target, within, path });
+        const target: Address =
+          from.name !== undefined
+            ? { documentId: from.documentId, name: from.name }
+            : { documentId: from.documentId };
+        edges.push({
+          source: node.type,
+          prop: 'of',
+          kind: 'include',
+          target,
+          within,
+          path,
+        });
       }
       forEachReference(node, (prop, value) => {
         const target = addressOf(value);
-        if (target) edges.push({ source: node.type, prop, kind: 'link', target, within, path });
+        if (target)
+          edges.push({
+            source: node.type,
+            prop,
+            kind: 'link',
+            target,
+            within,
+            path,
+          });
       });
     });
-    return this.set(id, { targets: collectTargets(root, this.options.name), edges, meta });
+    return this.set(id, {
+      targets: collectTargets(root, this.options.name),
+      edges,
+      meta,
+    });
   }
 
   /** Set a document entry from any source. */
@@ -188,7 +251,14 @@ export class CorpusIndex {
     const targets = new Map<string, IndexedTarget>();
     for (const target of input.targets ?? []) targets.set(target.name, target);
     const edges = [...(input.edges ?? [])].map((e) => ({ ...e, from: id }));
-    this.docs.set(id, { id, virtual: false, openNames: false, meta: input.meta ?? {}, targets, edges });
+    this.docs.set(id, {
+      id,
+      virtual: false,
+      openNames: false,
+      meta: input.meta ?? {},
+      targets,
+      edges,
+    });
     for (const edge of edges) this.link(edge.target.documentId, id);
     return this;
   }
@@ -198,12 +268,26 @@ export class CorpusIndex {
    * With `names` (name → tag name) only those elements are addressable; without, any element name is accepted.
    * Declaring over an indexed document is ignored (real content wins).
    */
-  declare(id: string, options: { readonly names?: Readonly<Record<string, string>>; readonly meta?: Readonly<Record<string, unknown>> } = {}): this {
+  declare(
+    id: string,
+    options: {
+      readonly names?: Readonly<Record<string, string>>;
+      readonly meta?: Readonly<Record<string, unknown>>;
+    } = {},
+  ): this {
     const existing = this.docs.get(id);
     if (existing && !existing.virtual) return this;
     const targets = new Map<string, IndexedTarget>();
-    for (const [name, type] of Object.entries(options.names ?? {})) targets.set(name, { name, type, path: [] });
-    this.docs.set(id, { id, virtual: true, openNames: !options.names, meta: options.meta ?? {}, targets, edges: [] });
+    for (const [name, type] of Object.entries(options.names ?? {}))
+      targets.set(name, { name, type, path: [] });
+    this.docs.set(id, {
+      id,
+      virtual: true,
+      openNames: !options.names,
+      meta: options.meta ?? {},
+      targets,
+      edges: [],
+    });
     return this;
   }
 
@@ -221,10 +305,19 @@ export class CorpusIndex {
 
   /** Make an old id point to a new one (a moved document): references to `from` resolve to `to`. */
   alias(from: string, to: string): this {
-    if (from === to) throw new TypeError(`CorpusIndex.alias: "${from}" cannot alias itself`);
-    if (this.docs.has(from)) throw new TypeError(`CorpusIndex.alias: "${from}" is a document, not an old id`);
-    for (let current: string | undefined = to; current !== undefined; current = this.aliases.get(current)) {
-      if (current === from) throw new TypeError(`CorpusIndex.alias: alias cycle through "${from}"`);
+    if (from === to)
+      throw new TypeError(`CorpusIndex.alias: "${from}" cannot alias itself`);
+    if (this.docs.has(from))
+      throw new TypeError(
+        `CorpusIndex.alias: "${from}" is a document, not an old id`,
+      );
+    for (
+      let current: string | undefined = to;
+      current !== undefined;
+      current = this.aliases.get(current)
+    ) {
+      if (current === from)
+        throw new TypeError(`CorpusIndex.alias: alias cycle through "${from}"`);
     }
     this.unalias(from);
     this.aliases.set(from, to);
@@ -250,7 +343,8 @@ export class CorpusIndex {
   private forgetEdges(id: string): void {
     const doc = this.docs.get(id);
     if (!doc) return;
-    for (const edge of doc.edges) this.referrers.get(edge.target.documentId)?.delete(id);
+    for (const edge of doc.edges)
+      this.referrers.get(edge.target.documentId)?.delete(id);
   }
 
   //
@@ -260,7 +354,12 @@ export class CorpusIndex {
   /** Follow aliases (`from → to → …`); `alias()` refuses cycles. */
   canonicalId(id: string): string {
     let current = id;
-    for (let next = this.aliases.get(current); next !== undefined; next = this.aliases.get(current)) current = next;
+    for (
+      let next = this.aliases.get(current);
+      next !== undefined;
+      next = this.aliases.get(current)
+    )
+      current = next;
     return current;
   }
 
@@ -324,14 +423,18 @@ export class CorpusIndex {
    * References pointing to a document (`'guide/intro'`) or to one element (`{ documentId, name }`), optionally of some
    * kinds only. Aliases are followed on both sides.
    */
-  incoming(to: string | Address, options: { readonly kinds?: readonly string[] } = {}): IndexedEdge[] {
+  incoming(
+    to: string | Address,
+    options: { readonly kinds?: readonly string[] } = {},
+  ): IndexedEdge[] {
     const target = typeof to === 'string' ? { documentId: to } : to;
     const documentId = this.canonicalId(target.documentId);
     const out: IndexedEdge[] = [];
     for (const from of this.referrersOf(documentId)) {
       for (const edge of this.docs.get(from)?.edges ?? []) {
         if (this.canonicalId(edge.target.documentId) !== documentId) continue;
-        if (target.name !== undefined && edge.target.name !== target.name) continue;
+        if (target.name !== undefined && edge.target.name !== target.name)
+          continue;
         if (options.kinds && !options.kinds.includes(edge.kind)) continue;
         out.push(edge);
       }
@@ -352,7 +455,12 @@ export class CorpusIndex {
 
   /** Invalidation policy of a relation kind. */
   policyOf(kind: string): InvalidationPolicy {
-    return this.options.kinds?.[kind] ?? (kind === 'include' ? 'recompile' : (this.options.defaultPolicy ?? 'rederive'));
+    return (
+      this.options.kinds?.[kind] ??
+      (kind === 'include'
+        ? 'recompile'
+        : (this.options.defaultPolicy ?? 'rederive'))
+    );
   }
 
   /**
@@ -376,8 +484,10 @@ export class CorpusIndex {
       const id = queue.shift()!;
       for (const edge of this.incoming(id)) {
         const policy = this.policyOf(edge.kind);
-        const action: AffectedAction = policy === 'none' ? 'revalidate' : policy;
-        if (bump(edge.from, action) && action === 'recompile') queue.push(edge.from);
+        const action: AffectedAction =
+          policy === 'none' ? 'revalidate' : policy;
+        if (bump(edge.from, action) && action === 'recompile')
+          queue.push(edge.from);
       }
     }
     return result;
@@ -390,7 +500,11 @@ export class CorpusIndex {
   /** Check references (of all documents, or of the given ones): missing documents, missing elements, wrong tags. */
   validate(ids?: Iterable<string>): Diagnostic[] {
     const out: Diagnostic[] = [];
-    const docs = ids ? [...ids].map((id) => this.get(id)).filter((d): d is IndexedDocument => !!d) : [...this.docs.values()];
+    const docs = ids
+      ? [...ids]
+          .map((id) => this.get(id))
+          .filter((d): d is IndexedDocument => !!d)
+      : [...this.docs.values()];
     for (const doc of docs) {
       for (const edge of doc.edges) {
         const where = `<${edge.source}> in "${doc.id}"`;
@@ -398,16 +512,30 @@ export class CorpusIndex {
         const document = this.get(edge.target.documentId);
         let problem: { code: string; message: string } | undefined;
         if (!document) {
-          problem = { code: 'ref/missing-document', message: `Reference to "${key}" from ${where}: document "${edge.target.documentId}" does not exist` };
-        } else if (edge.target.name !== undefined && !document.targets.has(edge.target.name) && !document.openNames) {
-          problem = { code: 'ref/missing-target', message: `Reference to "${key}" from ${where}: document "${document.id}" has no element "${edge.target.name}"` };
+          problem = {
+            code: 'ref/missing-document',
+            message: `Reference to "${key}" from ${where}: document "${edge.target.documentId}" does not exist`,
+          };
+        } else if (
+          edge.target.name !== undefined &&
+          !document.targets.has(edge.target.name) &&
+          !document.openNames
+        ) {
+          problem = {
+            code: 'ref/missing-target',
+            message: `Reference to "${key}" from ${where}: document "${document.id}" has no element "${edge.target.name}"`,
+          };
         }
         if (problem) {
           const severity = this.severityOf(edge);
-          if (severity !== 'ignore') out.push({ severity, ...problem, pos: edge.pos, path: edge.path });
+          if (severity !== 'ignore')
+            out.push({ severity, ...problem, pos: edge.pos, path: edge.path });
           continue;
         }
-        const target = edge.target.name !== undefined ? document!.targets.get(edge.target.name) : undefined;
+        const target =
+          edge.target.name !== undefined
+            ? document!.targets.get(edge.target.name)
+            : undefined;
         if (edge.expects && target && target.type !== edge.expects) {
           out.push({
             severity: 'error',
@@ -435,7 +563,12 @@ export class CorpusIndex {
   registryEntries(): RegistryEntry[] {
     return [...this.docs.values()]
       .filter((d) => !d.openNames)
-      .map((d) => ({ id: d.id, names: Object.fromEntries([...d.targets.values()].map((t) => [t.name, t.type])) }))
+      .map((d) => ({
+        id: d.id,
+        names: Object.fromEntries(
+          [...d.targets.values()].map((t) => [t.name, t.type]),
+        ),
+      }))
       .sort((a, b) => compareStrings(a.id, b.id));
   }
 
@@ -454,27 +587,43 @@ export class CorpusIndex {
     };
   }
 
-  static fromJSON(json: CorpusIndexJSON, options: CorpusIndexOptions = {}): CorpusIndex {
-    if (json.v !== 1) throw new TypeError(`Unsupported corpus index version ${String((json as { v: unknown }).v)}`);
+  static fromJSON(
+    json: CorpusIndexJSON,
+    options: CorpusIndexOptions = {},
+  ): CorpusIndex {
+    if (json.v !== 1)
+      throw new TypeError(
+        `Unsupported corpus index version ${String((json as { v: unknown }).v)}`,
+      );
     const index = new CorpusIndex(options);
     for (const d of json.documents) {
       if (d.virtual) {
-        index.declare(d.id, { names: d.openNames ? undefined : Object.fromEntries(d.targets.map((t) => [t.name, t.type])), meta: d.meta });
+        index.declare(d.id, {
+          names: d.openNames
+            ? undefined
+            : Object.fromEntries(d.targets.map((t) => [t.name, t.type])),
+          meta: d.meta,
+        });
       } else {
         index.set(d.id, { targets: d.targets, edges: d.edges, meta: d.meta });
       }
     }
-    for (const [from, to] of Object.entries(json.aliases ?? {})) index.alias(from, to);
+    for (const [from, to] of Object.entries(json.aliases ?? {}))
+      index.alias(from, to);
     return index;
   }
 }
 
-function collectTargets(root: BaseNode, name: ((node: BaseNode) => string | undefined) | undefined): IndexedTarget[] {
+function collectTargets(
+  root: BaseNode,
+  name: ((node: BaseNode) => string | undefined) | undefined,
+): IndexedTarget[] {
   const out: IndexedTarget[] = [];
   walk(root, (node, ctx) => {
     if (isTextNode(node) || node === root) return;
     const n = name ? name(node) : node.ref;
-    if (n !== undefined) out.push({ name: n, type: node.type, id: node.id, path: [...ctx.path] });
+    if (n !== undefined)
+      out.push({ name: n, type: node.type, id: node.id, path: [...ctx.path] });
   });
   return out;
 }

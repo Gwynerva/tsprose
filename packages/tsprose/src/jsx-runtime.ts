@@ -1,4 +1,8 @@
-import { createElement, makeFragment, type ComponentResult } from './element.js';
+import {
+  createElement,
+  makeFragment,
+  type ComponentResult,
+} from './element.js';
 import type { BaseNode } from './node.js';
 import type { AnyTag } from './tag.js';
 
@@ -11,13 +15,23 @@ export const Fragment: unique symbol = Symbol.for('tsprose.fragment');
  */
 export const POSITION_PROP = '__tsprosePos';
 
-function create(type: unknown, props: Record<string, unknown> | null | undefined, pos?: { fileName: string; lineNumber: number; columnNumber: number }): BaseNode {
-  let position = pos ? { file: pos.fileName, line: pos.lineNumber, column: pos.columnNumber } : undefined;
+function create(
+  type: unknown,
+  props: Record<string, unknown> | null | undefined,
+  pos?: { fileName: string; lineNumber: number; columnNumber: number },
+): BaseNode {
+  let position = pos
+    ? { file: pos.fileName, line: pos.lineNumber, column: pos.columnNumber }
+    : undefined;
   if (props && POSITION_PROP in props) {
     const { [POSITION_PROP]: hidden, ...rest } = props;
     props = rest;
     if (!position && Array.isArray(hidden) && hidden.length === 3) {
-      position = { file: String(hidden[0]), line: Number(hidden[1]), column: Number(hidden[2]) };
+      position = {
+        file: String(hidden[0]),
+        line: Number(hidden[1]),
+        column: Number(hidden[2]),
+      };
     }
   }
   if (type === Fragment) {
@@ -26,7 +40,11 @@ function create(type: unknown, props: Record<string, unknown> | null | undefined
   return createElement(type, props, position);
 }
 
-export function jsx(type: unknown, props: Record<string, unknown> | null | undefined, _key?: unknown): BaseNode {
+export function jsx(
+  type: unknown,
+  props: Record<string, unknown> | null | undefined,
+  _key?: unknown,
+): BaseNode {
   return create(type, props);
 }
 

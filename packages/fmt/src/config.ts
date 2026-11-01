@@ -1,6 +1,15 @@
-import { loadTsproseConfig, type TsproseConfig } from '@tsprose/transform/tooling';
+import {
+  loadTsproseConfig,
+  type TsproseConfig,
+} from '@tsprose/transform/tooling';
 import type { Kind } from './format.js';
-import { inlineContainerFromTags, kindOfFromLists, kindOfFromTags, optionsFromDescription, type TagsDescriptionLike } from './kinds.js';
+import {
+  inlineContainerFromTags,
+  kindOfFromLists,
+  kindOfFromTags,
+  optionsFromDescription,
+  type TagsDescriptionLike,
+} from './kinds.js';
 import type { PipelineOptions, PreFormat } from './pipeline.js';
 
 /**
@@ -12,7 +21,9 @@ export function fmtOptionsFromConfig(config: TsproseConfig): PipelineOptions {
   let isInlineContainer: ((name: string) => boolean) | undefined;
   let blockCalls = config.blockCalls;
   if (config.manifest && typeof config.manifest === 'object') {
-    const fromManifest = optionsFromDescription(config.manifest as TagsDescriptionLike);
+    const fromManifest = optionsFromDescription(
+      config.manifest as TagsDescriptionLike,
+    );
     kindOf = fromManifest.kindOf;
     isInlineContainer = fromManifest.isInlineContainer;
     blockCalls = [...fromManifest.blockCalls, ...(config.blockCalls ?? [])];
@@ -22,10 +33,16 @@ export function fmtOptionsFromConfig(config: TsproseConfig): PipelineOptions {
     isInlineContainer = inlineContainerFromTags(tags);
   } else if (config.inlineTags) {
     kindOf = kindOfFromLists(config.inlineTags, config.blockTags ?? []);
-    const inline = new Set([...config.inlineTags, ...(config.inlineContainers ?? [])]);
+    const inline = new Set([
+      ...config.inlineTags,
+      ...(config.inlineContainers ?? []),
+    ]);
     isInlineContainer = (name) => inline.has(name);
   }
-  const compact = config.separateBlocks === true && config.compactContainers?.length ? new Set(config.compactContainers) : undefined;
+  const compact =
+    config.separateBlocks === true && config.compactContainers?.length
+      ? new Set(config.compactContainers)
+      : undefined;
   return {
     printWidth: config.printWidth,
     indent: config.indent,
@@ -33,7 +50,9 @@ export function fmtOptionsFromConfig(config: TsproseConfig): PipelineOptions {
     kindOf,
     isInlineContainer,
     blockCalls,
-    separateBlocks: compact ? (name: string | undefined) => name === undefined || !compact.has(name) : config.separateBlocks,
+    separateBlocks: compact
+      ? (name: string | undefined) => name === undefined || !compact.has(name)
+      : config.separateBlocks,
     closing: config.closing,
     opening: config.opening,
     preFormat: config.preFormat as PreFormat | undefined,
@@ -42,7 +61,12 @@ export function fmtOptionsFromConfig(config: TsproseConfig): PipelineOptions {
 }
 
 /** Load a `tsprose.config.ts` (or a JSON tags description) as formatter options, with the loader's warnings. */
-export async function loadFmtConfig(path: string): Promise<{ options: PipelineOptions; warnings: readonly string[] }> {
+export async function loadFmtConfig(
+  path: string,
+): Promise<{ options: PipelineOptions; warnings: readonly string[] }> {
   const loaded = await loadTsproseConfig(path);
-  return { options: fmtOptionsFromConfig(loaded.config), warnings: loaded.warnings };
+  return {
+    options: fmtOptionsFromConfig(loaded.config),
+    warnings: loaded.warnings,
+  };
 }

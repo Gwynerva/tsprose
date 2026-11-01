@@ -47,7 +47,9 @@ function tokenize(src: string): Token[] {
     }
     const m = NAME_RE.exec(src.slice(i));
     if (!m) {
-      throw new SyntaxError(`Invalid children pattern "${src}": unexpected character "${ch}" at ${i}`);
+      throw new SyntaxError(
+        `Invalid children pattern "${src}": unexpected character "${ch}" at ${i}`,
+      );
     }
     tokens.push({ kind: 'name', value: m[0] });
     i += m[0].length;
@@ -90,7 +92,10 @@ export function compilePattern(source: string): CompiledPattern {
   function parseItem(): string {
     const t = next();
     let atom: string;
-    if (!t) throw new SyntaxError(`Invalid children pattern "${source}": unexpected end`);
+    if (!t)
+      throw new SyntaxError(
+        `Invalid children pattern "${source}": unexpected end`,
+      );
     if (t.kind === 'name') {
       names.add(t.value);
       atom = `(?:${escapeRe(t.value)},)`;
@@ -98,11 +103,15 @@ export function compilePattern(source: string): CompiledPattern {
       const inner = parseAlternatives();
       const close = next();
       if (!close || close.kind !== ')') {
-        throw new SyntaxError(`Invalid children pattern "${source}": missing ")"`);
+        throw new SyntaxError(
+          `Invalid children pattern "${source}": missing ")"`,
+        );
       }
       atom = `(?:${inner})`;
     } else {
-      throw new SyntaxError(`Invalid children pattern "${source}": unexpected "${t.kind === 'q' ? t.value : t.kind}"`);
+      throw new SyntaxError(
+        `Invalid children pattern "${source}": unexpected "${t.kind === 'q' ? t.value : t.kind}"`,
+      );
     }
     const q = peek();
     if (q && q.kind === 'q') {
@@ -114,10 +123,14 @@ export function compilePattern(source: string): CompiledPattern {
 
   const body = parseAlternatives();
   if (pos !== tokens.length) {
-    throw new SyntaxError(`Invalid children pattern "${source}": unexpected ")"`);
+    throw new SyntaxError(
+      `Invalid children pattern "${source}": unexpected ")"`,
+    );
   }
   if (names.size === 0) {
-    throw new SyntaxError(`Invalid children pattern "${source}": empty pattern`);
+    throw new SyntaxError(
+      `Invalid children pattern "${source}": empty pattern`,
+    );
   }
   const re = new RegExp(`^${body}$`);
   return {

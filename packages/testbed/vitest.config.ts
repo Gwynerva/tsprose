@@ -8,5 +8,7 @@ export default defineConfig({
     include: ['test/**/*.test.ts', 'test/**/*.test.tsx'],
     testTimeout: 60_000,
   },
-  oxc: { jsx: { runtime: 'automatic', importSource: 'tsprose', development: true } },
+  oxc: {
+    jsx: { runtime: 'automatic', importSource: 'tsprose', development: true },
+  },
 });

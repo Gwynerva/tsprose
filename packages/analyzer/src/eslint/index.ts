@@ -33,15 +33,20 @@ function manifestFor(setting: Manifest | TagsDescription): Manifest {
 }
 
 function findingsFor(context: Rule.RuleContext, rule: RuleName): Finding[] {
-  const setting = (context.settings as { tsprose?: Manifest | TagsDescription }).tsprose;
+  const setting = (context.settings as { tsprose?: Manifest | TagsDescription })
+    .tsprose;
   if (!setting || typeof setting !== 'object') {
-    throw new Error('@tsprose/analyzer: settings.tsprose (a Manifest or a JSON tags description) is required');
+    throw new Error(
+      '@tsprose/analyzer: settings.tsprose (a Manifest or a JSON tags description) is required',
+    );
   }
   const manifest = manifestFor(setting);
   const ast = context.sourceCode.ast as unknown as EsNode;
   let all = cache.get(ast);
   if (!all) {
-    all = analyzeProgram(ast, context.sourceCode.text, context.filename, { manifest });
+    all = analyzeProgram(ast, context.sourceCode.text, context.filename, {
+      manifest,
+    });
     cache.set(ast, all);
   }
   return all.filter((f) => f.rule === rule);
@@ -49,7 +54,13 @@ function findingsFor(context: Rule.RuleContext, rule: RuleName): Finding[] {
 
 function makeRule(rule: RuleName, description: string): Rule.RuleModule {
   return {
-    meta: { type: 'problem', docs: { description }, fixable: 'code', schema: [], messages: { finding: '{{message}}' } },
+    meta: {
+      type: 'problem',
+      docs: { description },
+      fixable: 'code',
+      schema: [],
+      messages: { finding: '{{message}}' },
+    },
     create(context) {
       return {
         Program() {
@@ -60,7 +71,13 @@ function makeRule(rule: RuleName, description: string): Rule.RuleModule {
               loc: { start, end },
               messageId: 'finding',
               data: { message: `${f.code}: ${f.message}` },
-              fix: f.fix ? (fixer) => fixer.replaceTextRange([f.fix!.range[0], f.fix!.range[1]], f.fix!.text) : undefined,
+              fix: f.fix
+                ? (fixer) =>
+                    fixer.replaceTextRange(
+                      [f.fix!.range[0], f.fix!.range[1]],
+                      f.fix!.text,
+                    )
+                : undefined,
             });
           }
         },
@@ -70,15 +87,32 @@ function makeRule(rule: RuleName, description: string): Rule.RuleModule {
 }
 
 const rules: Record<string, Rule.RuleModule> = {
-  'valid-children': makeRule('children', 'Children must satisfy the tag definition (kind, allowed types, arity, content model)'),
-  'valid-props': makeRule('props', 'Only defined props; `$` where the definition requires or allows it'),
-  refs: makeRule('refs', 'Each handle from defineRefs is used exactly once in its file'),
-  whitespace: makeRule('whitespace', 'Line breaks between inline content and {\' \'} hacks'),
-  braces: makeRule('braces', 'LaTeX braces written in JSX text become JSX expressions (\\sqrt{20} renders as \\sqrt20)'),
+  'valid-children': makeRule(
+    'children',
+    'Children must satisfy the tag definition (kind, allowed types, arity, content model)',
+  ),
+  'valid-props': makeRule(
+    'props',
+    'Only defined props; `$` where the definition requires or allows it',
+  ),
+  refs: makeRule(
+    'refs',
+    'Each handle from defineRefs is used exactly once in its file',
+  ),
+  whitespace: makeRule(
+    'whitespace',
+    "Line breaks between inline content and {' '} hacks",
+  ),
+  braces: makeRule(
+    'braces',
+    'LaTeX braces written in JSX text become JSX expressions (\\sqrt{20} renders as \\sqrt20)',
+  ),
 };
 
 // src/eslint and dist/eslint are both two levels below the package root.
-const { version } = createRequire(import.meta.url)('../../package.json') as { version: string };
+const { version } = createRequire(import.meta.url)('../../package.json') as {
+  version: string;
+};
 
 const plugin: ESLint.Plugin & { configs: { recommended: Linter.Config } } = {
   meta: { name: '@tsprose/analyzer', version },

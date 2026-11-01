@@ -12,7 +12,10 @@ export interface LoadedDocument {
 
 /** `content/01-foundations/02-equations/03-quadratic/article.tsx` → `foundations/equations/quadratic/article` */
 export function documentIdFromPath(root: string, file: string): string {
-  const rel = relative(root, file).split(sep).join('/').replace(/\.tsx?$/, '');
+  const rel = relative(root, file)
+    .split(sep)
+    .join('/')
+    .replace(/\.tsx?$/, '');
   return rel
     .split('/')
     .map((segment) => segment.replace(/^\d+[-+]/, ''))
@@ -21,10 +24,17 @@ export function documentIdFromPath(root: string, file: string): string {
 
 export async function* contentFiles(root: string): AsyncGenerator<string> {
   for (const entry of await readdir(root, { withFileTypes: true })) {
-    if (entry.name.startsWith('.') || entry.name === 'node_modules' || entry.name === 'assets' || entry.name === 'scripts') continue;
+    if (
+      entry.name.startsWith('.') ||
+      entry.name === 'node_modules' ||
+      entry.name === 'assets' ||
+      entry.name === 'scripts'
+    )
+      continue;
     const full = join(root, entry.name);
     if (entry.isDirectory()) yield* contentFiles(full);
-    else if (/\.tsx$/.test(entry.name) && !entry.name.endsWith('.refs.tsx')) yield full;
+    else if (/\.tsx$/.test(entry.name) && !entry.name.endsWith('.refs.tsx'))
+      yield full;
   }
 }
 
@@ -34,14 +44,24 @@ export async function* contentFiles(root: string): AsyncGenerator<string> {
  * so other documents' imports of `./refs` resolve by value.
  */
 export type Importer = (file: string) => Promise<Record<string, unknown>>;
-const defaultImporter: Importer = (file) => import(pathToFileURL(file).href) as Promise<Record<string, unknown>>;
+const defaultImporter: Importer = (file) =>
+  import(pathToFileURL(file).href) as Promise<Record<string, unknown>>;
 
-export async function loadCorpus(root: string, importer: Importer = defaultImporter): Promise<{ corpus: Corpus; documents: LoadedDocument[] }> {
+export async function loadCorpus(
+  root: string,
+  importer: Importer = defaultImporter,
+): Promise<{ corpus: Corpus; documents: LoadedDocument[] }> {
   const corpus = new Corpus();
   const documents: LoadedDocument[] = [];
   for await (const file of contentFiles(root)) {
     const mod = await importer(file);
-    const doc = (isDocument(mod.default) ? mod.default : isDocument(mod.content) ? mod.content : undefined) as Document | undefined;
+    const doc = (
+      isDocument(mod.default)
+        ? mod.default
+        : isDocument(mod.content)
+          ? mod.content
+          : undefined
+    ) as Document | undefined;
     if (!doc) continue;
     const id = documentIdFromPath(root, file);
     corpus.add(id, doc);

@@ -1,5 +1,10 @@
 import { transform } from '@tsprose/transform';
-import { classifyJsxChild, hasNewline, leadingWhitespace, trailingWhitespace } from '@tsprose/transform/tooling';
+import {
+  classifyJsxChild,
+  hasNewline,
+  leadingWhitespace,
+  trailingWhitespace,
+} from '@tsprose/transform/tooling';
 import { forEachJsxContainer, rangeOf, type EsNode } from '../estree.js';
 import type { Finding, Manifest } from '../types.js';
 
@@ -8,7 +13,12 @@ import type { Finding, Manifest } from '../types.js';
  * report it with an autofix that inserts `{' '}`.
  * With the transform: `{' '}` hacks are redundant where a line break already separates content.
  */
-export function checkWhitespace(program: EsNode, source: string, fileName: string, manifest: Manifest): Finding[] {
+export function checkWhitespace(
+  program: EsNode,
+  source: string,
+  fileName: string,
+  manifest: Manifest,
+): Finding[] {
   const isBlock = (name: string) => manifest.tags[name]?.def.kind === 'block';
   const findings: Finding[] = [];
   if (!manifest.transform) {
@@ -19,7 +29,8 @@ export function checkWhitespace(program: EsNode, source: string, fileName: strin
         code: 'whitespace/lost-space',
         rule: 'whitespace',
         severity: 'warning',
-        message: 'Line break between inline content drops the space in JSX; insert {\' \'} or enable @tsprose/transform',
+        message:
+          "Line break between inline content drops the space in JSX; insert {' '} or enable @tsprose/transform",
         range: [ins.offset, ins.offset],
         fix: { range: [ins.offset, ins.offset], text: "{' '}" },
       });
@@ -35,15 +46,20 @@ export function checkWhitespace(program: EsNode, source: string, fileName: strin
         if (!n || n.type !== 'JSXText') return false;
         const [s, e] = rangeOf(n);
         const text = source.slice(s, e);
-        return hasNewline(edge === 'start' ? leadingWhitespace(text) : trailingWhitespace(text));
+        return hasNewline(
+          edge === 'start' ? leadingWhitespace(text) : trailingWhitespace(text),
+        );
       };
-      const safe = brokenAt(children[i - 1], 'end') || brokenAt(children[i + 1], 'start');
+      const safe =
+        brokenAt(children[i - 1], 'end') || brokenAt(children[i + 1], 'start');
       const range = rangeOf(child);
       findings.push({
         code: 'whitespace/space-hack',
         rule: 'whitespace',
         severity: 'warning',
-        message: safe ? "{' '} is redundant: the line break is a space with @tsprose/transform" : "{' '} on one line: write a plain space instead",
+        message: safe
+          ? "{' '} is redundant: the line break is a space with @tsprose/transform"
+          : "{' '} on one line: write a plain space instead",
         range,
         fix: safe ? { range, text: '' } : undefined,
       });

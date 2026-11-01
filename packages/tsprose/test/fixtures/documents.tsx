@@ -1,9 +1,30 @@
 // A tiny corpus: an article with refs, a summary that includes and links to it, and a broken document.
-import { defineDocument, defineRefs, Include, defineInline, refSchema } from 'tsprose';
-import { B, Details, H1, Heading, Image, P, Proof, Qed, Sec, Theorem } from './tags.js';
+import {
+  defineDocument,
+  defineRefs,
+  Include,
+  defineInline,
+  refSchema,
+} from 'tsprose';
+import {
+  B,
+  Details,
+  H1,
+  Heading,
+  Image,
+  P,
+  Proof,
+  Qed,
+  Sec,
+  Theorem,
+} from './tags.js';
 
 /** Link tag: `to` accepts any ref handle; compile turns it into an outgoing reference. */
-export const Link = defineInline({ name: 'link', props: { to: refSchema() }, children: 'inline' });
+export const Link = defineInline({
+  name: 'link',
+  props: { to: refSchema() },
+  children: 'inline',
+});
 
 //
 // article
@@ -25,11 +46,13 @@ export const article = defineDocument(
       </P>
       <Theorem $={articleRefs.pythagoras} title="Pythagorean theorem">
         <P>
-          The square of the hypotenuse equals the sum of the squares of the legs.
+          The square of the hypotenuse equals the sum of the squares of the
+          legs.
         </P>
         <Proof>
           <P>
-            Rearrange four copies of the triangle (see the <Link to={articleRefs.intro}>introduction</Link>).
+            Rearrange four copies of the triangle (see the{' '}
+            <Link to={articleRefs.intro}>introduction</Link>).
           </P>
           <Details $={articleRefs._why} title="Why four?">
             <P>Because the square has four corners.</P>
@@ -52,7 +75,9 @@ export const article = defineDocument(
 // summary (includes the theorem, links to the intro)
 //
 
-export const summaryRefs = defineRefs('file:///corpus/summary/refs.ts', { recap: P });
+export const summaryRefs = defineRefs('file:///corpus/summary/refs.ts', {
+  recap: P,
+});
 
 export const summary = defineDocument(
   () => (
@@ -71,7 +96,10 @@ export const summary = defineDocument(
 // broken: unused ref, foreign ref as $, duplicate string refs, missing title
 //
 
-export const brokenRefs = defineRefs('file:///corpus/broken/refs.ts', { unused: P, used: P });
+export const brokenRefs = defineRefs('file:///corpus/broken/refs.ts', {
+  unused: P,
+  used: P,
+});
 
 export const broken = defineDocument(
   () => (
@@ -93,8 +121,12 @@ export const broken = defineDocument(
 // include cycle: a includes b, b includes a
 //
 
-export const cycleARefs = defineRefs('file:///corpus/cycle-a/refs.ts', { a: P });
-export const cycleBRefs = defineRefs('file:///corpus/cycle-b/refs.ts', { b: P });
+export const cycleARefs = defineRefs('file:///corpus/cycle-a/refs.ts', {
+  a: P,
+});
+export const cycleBRefs = defineRefs('file:///corpus/cycle-b/refs.ts', {
+  b: P,
+});
 export const cycleA = defineDocument(
   () => (
     <>

@@ -26,14 +26,22 @@ for await (const file of walkProseFiles(dir)) {
   total += result.insertions.length;
   const t = result.insertions.filter((i) => i.between === 'text').length;
   textual += t;
-  console.log(`${result.insertions.length.toString().padStart(4)} (${t.toString().padStart(3)} text)  ${file}`);
+  console.log(
+    `${result.insertions.length.toString().padStart(4)} (${t.toString().padStart(3)} text)  ${file}`,
+  );
   if (show) {
     const lines = source.split(/\r\n|\r|\n/);
-    for (const ins of result.insertions.filter((i) => i.between === 'text').slice(0, 40)) {
+    for (const ins of result.insertions
+      .filter((i) => i.between === 'text')
+      .slice(0, 40)) {
       const before = (lines[ins.line - 2] ?? '').trim();
       const line = lines[ins.line - 1] ?? '';
-      console.log(`      ${ins.line}:${ins.column}  …${before.slice(-30)} ⏎ ${line.slice(ins.column - 1, ins.column + 40)}`);
+      console.log(
+        `      ${ins.line}:${ins.column}  …${before.slice(-30)} ⏎ ${line.slice(ins.column - 1, ins.column + 40)}`,
+      );
     }
   }
 }
-console.log(`\n${total} insertions (${textual} text-adjacent, ${total - textual} between elements) in ${touched}/${totalFiles} files, ${(performance.now() - started).toFixed(0)} ms`);
+console.log(
+  `\n${total} insertions (${textual} text-adjacent, ${total - textual} between elements) in ${touched}/${totalFiles} files, ${(performance.now() - started).toFixed(0)} ms`,
+);

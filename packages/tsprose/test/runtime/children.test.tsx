@@ -1,7 +1,23 @@
 import { describe, expect, it } from 'vitest';
-import { flattenChildren, isTextNode, type AnyNode, type BaseNode } from 'tsprose';
+import {
+  flattenChildren,
+  isTextNode,
+  type AnyNode,
+  type BaseNode,
+} from 'tsprose';
 import { normalizeWhitespace } from 'tsprose/internal';
-import { B, P, Proof, Qed, Sec, Theorem, Td, Tr, Table, M } from '../fixtures/tags.js';
+import {
+  B,
+  P,
+  Proof,
+  Qed,
+  Sec,
+  Theorem,
+  Td,
+  Tr,
+  Table,
+  M,
+} from '../fixtures/tags.js';
 
 const texts = (nodes: AnyNode[] | undefined) =>
   (nodes ?? []).map((n) => (isTextNode(n) ? n.text : `<${n.type}>`));
@@ -35,32 +51,44 @@ describe('normalizeWhitespace', () => {
   const block = (): AnyNode => (<Qed />) as BaseNode;
 
   it('inline context: collapses runs and trims edges', () => {
-    expect(texts(normalizeWhitespace([t('  a \n\t b  '), inline(), t(' c  ')], 'inline'))).toEqual([
-      'a b ',
-      '<bold>',
-      ' c',
-    ]);
+    expect(
+      texts(
+        normalizeWhitespace([t('  a \n\t b  '), inline(), t(' c  ')], 'inline'),
+      ),
+    ).toEqual(['a b ', '<bold>', ' c']);
   });
 
   it('inline context: keeps a single space between inline nodes', () => {
-    expect(texts(normalizeWhitespace([inline(), t(' \n '), inline()], 'inline'))).toEqual(['<bold>', ' ', '<bold>']);
+    expect(
+      texts(normalizeWhitespace([inline(), t(' \n '), inline()], 'inline')),
+    ).toEqual(['<bold>', ' ', '<bold>']);
   });
 
   it('inline context: never touches NBSP', () => {
-    expect(texts(normalizeWhitespace([t(' a   ')], 'inline'))).toEqual([' a   ']);
+    expect(texts(normalizeWhitespace([t(' a   ')], 'inline'))).toEqual([
+      ' a   ',
+    ]);
   });
 
   it('block context: drops whitespace-only text, keeps real text', () => {
-    expect(texts(normalizeWhitespace([t('\n  '), block(), t(' x '), block(), t('\n')], 'block'))).toEqual([
-      '<qed>',
-      ' x ',
-      '<qed>',
-    ]);
+    expect(
+      texts(
+        normalizeWhitespace(
+          [t('\n  '), block(), t(' x '), block(), t('\n')],
+          'block',
+        ),
+      ),
+    ).toEqual(['<qed>', ' x ', '<qed>']);
   });
 
   it('mixed context: drops spaces touching blocks and edges', () => {
     expect(
-      texts(normalizeWhitespace([t(' a '), block(), t(' b '), inline(), t(' c '), block(), t(' ')], 'mixed')),
+      texts(
+        normalizeWhitespace(
+          [t(' a '), block(), t(' b '), inline(), t(' c '), block(), t(' ')],
+          'mixed',
+        ),
+      ),
     ).toEqual(['a', '<qed>', 'b ', '<bold>', ' c', '<qed>']);
   });
 });
@@ -86,14 +114,37 @@ describe('children rules at tag call', () => {
   });
 
   it('tag list rejects foreign types and validates the pattern', () => {
-    const ok = Theorem({ $: 'thm', title: 'T', children: [<P>a</P>, <Proof><Qed /></Proof>, <Qed />] });
+    const ok = Theorem({
+      $: 'thm',
+      title: 'T',
+      children: [
+        <P>a</P>,
+        <Proof>
+          <Qed />
+        </Proof>,
+        <Qed />,
+      ],
+    });
     expect(ok.diagnostics).toBeUndefined();
     expect(ok.data).toEqual({ slug: 't', count: 3 });
 
-    const wrongType = Theorem({ $: 'thm', title: 'T', children: [<P>a</P>, <Sec><Qed /></Sec>] });
+    const wrongType = Theorem({
+      $: 'thm',
+      title: 'T',
+      children: [
+        <P>a</P>,
+        <Sec>
+          <Qed />
+        </Sec>,
+      ],
+    });
     expect(diags(wrongType)).toEqual(['children/type', 'children/pattern']);
 
-    const wrongOrder = Theorem({ $: 'thm', title: 'T', children: [<Qed />, <P>a</P>] });
+    const wrongOrder = Theorem({
+      $: 'thm',
+      title: 'T',
+      children: [<Qed />, <P>a</P>],
+    });
     expect(diags(wrongOrder)).toEqual(['children/pattern']);
   });
 
@@ -103,7 +154,14 @@ describe('children rules at tag call', () => {
   });
 
   it('lazy (recursive) tag lists resolve on first use', () => {
-    const table = Table({ children: <Tr><Td>1</Td><Td center>2</Td></Tr> });
+    const table = Table({
+      children: (
+        <Tr>
+          <Td>1</Td>
+          <Td center>2</Td>
+        </Tr>
+      ),
+    });
     expect(table.diagnostics).toBeUndefined();
     const bad = Table({ children: <Td>x</Td> });
     expect(diags(bad)).toEqual(['children/type']);

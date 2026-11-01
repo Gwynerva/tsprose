@@ -38,7 +38,10 @@ describe('NodeOf inference', () => {
     type T = NodeOf<typeof Theorem>;
     expectTypeOf<T['type']>().toEqualTypeOf<'theorem'>();
     expectTypeOf<T['kind']>().toEqualTypeOf<'block'>();
-    expectTypeOf<T['props']>().toEqualTypeOf<{ title: string; level?: number | undefined }>();
+    expectTypeOf<T['props']>().toEqualTypeOf<{
+      title: string;
+      level?: number | undefined;
+    }>();
     expectTypeOf<T['data']>().toEqualTypeOf<{ slug: string; count: number }>();
     expectTypeOf<T['ref']>().toEqualTypeOf<string>();
     expectTypeOf<T['id']>().toEqualTypeOf<string | undefined>();
@@ -47,7 +50,9 @@ describe('NodeOf inference', () => {
 
   it('children: tag list → union of node types (structural)', () => {
     type C = NodeOf<typeof Theorem>['children'];
-    expectTypeOf<C[number]['type']>().toEqualTypeOf<'paragraph' | 'proof' | 'qed'>();
+    expectTypeOf<C[number]['type']>().toEqualTypeOf<
+      'paragraph' | 'proof' | 'qed'
+    >();
     expectTypeOf<C[number]>().toExtend<BaseNode>();
   });
 
@@ -67,23 +72,39 @@ describe('NodeOf inference', () => {
 
   it('data defaults to undefined', () => {
     expectTypeOf<NodeOf<typeof Qed>['data']>().toEqualTypeOf<undefined>();
-    expectTypeOf<NodeOf<typeof Sec>['data']>().toEqualTypeOf<{ count: number }>();
+    expectTypeOf<NodeOf<typeof Sec>['data']>().toEqualTypeOf<{
+      count: number;
+    }>();
     expectTypeOf<NodeOf<typeof Item>['data']>().toEqualTypeOf<number>();
   });
 
   it('recursive and mutually recursive tags via explicit interfaces', () => {
-    expectTypeOf<NodeOf<typeof Item>['children'][number]['type']>().toEqualTypeOf<'item' | 'paragraph'>();
-    expectTypeOf<NodeOf<typeof Table>['children'][number]['type']>().toEqualTypeOf<'tr'>();
-    expectTypeOf<NodeOf<typeof Tr>['children'][number]['type']>().toEqualTypeOf<'td'>();
-    expectTypeOf<NodeOf<typeof Em>['children'][number]['type']>().toEqualTypeOf<'em' | 'bold'>();
+    expectTypeOf<
+      NodeOf<typeof Item>['children'][number]['type']
+    >().toEqualTypeOf<'item' | 'paragraph'>();
+    expectTypeOf<
+      NodeOf<typeof Table>['children'][number]['type']
+    >().toEqualTypeOf<'tr'>();
+    expectTypeOf<
+      NodeOf<typeof Tr>['children'][number]['type']
+    >().toEqualTypeOf<'td'>();
+    expectTypeOf<NodeOf<typeof Em>['children'][number]['type']>().toEqualTypeOf<
+      'em' | 'bold'
+    >();
     expectTypeOf<typeof Item>().toEqualTypeOf<Tag<ItemDef>>();
-    expectTypeOf<Node<ItemDef>['children']>().toEqualTypeOf<(Node<ItemDef> | NodeOf<typeof P>)[]>();
+    expectTypeOf<Node<ItemDef>['children']>().toEqualTypeOf<
+      (Node<ItemDef> | NodeOf<typeof P>)[]
+    >();
   });
 
   it('presets keep the definition', () => {
     expectTypeOf<NodeOf<typeof H1>>().toEqualTypeOf<NodeOf<typeof Heading>>();
-    expectTypeOf<'level' extends keyof Parameters<typeof H1>[0] ? true : false>().toEqualTypeOf<false>();
-    expectTypeOf<'level' extends keyof Parameters<typeof Heading>[0] ? true : false>().toEqualTypeOf<true>();
+    expectTypeOf<
+      'level' extends keyof Parameters<typeof H1>[0] ? true : false
+    >().toEqualTypeOf<false>();
+    expectTypeOf<
+      'level' extends keyof Parameters<typeof Heading>[0] ? true : false
+    >().toEqualTypeOf<true>();
   });
 
   it('tags are assignable to AnyTag and usable in mixed lists', () => {
@@ -97,7 +118,10 @@ describe('NodeOf inference', () => {
   it('no any leaks', () => {
     expectTypeOf<NodeOf<typeof Theorem>['props']>().not.toBeAny();
     expectTypeOf<NodeOf<typeof Theorem>['data']>().not.toBeAny();
-    expectTypeOf<NodeOf<typeof Image>['props']>().toEqualTypeOf<{ src: string; width?: number | undefined }>();
+    expectTypeOf<NodeOf<typeof Image>['props']>().toEqualTypeOf<{
+      src: string;
+      width?: number | undefined;
+    }>();
   });
 });
 
@@ -108,7 +132,10 @@ describe('data callback typing', () => {
       props: { n: s.number(), label: s.optional(s.string()) },
       children: [P, Qed],
       data: ({ props, children }) => {
-        expectTypeOf(props).toEqualTypeOf<{ n: number; label?: string | undefined }>();
+        expectTypeOf(props).toEqualTypeOf<{
+          n: number;
+          label?: string | undefined;
+        }>();
         expectTypeOf(children[0]!.type).toEqualTypeOf<'paragraph' | 'qed'>();
         return props.n;
       },
@@ -125,16 +152,24 @@ describe('data callback typing', () => {
   });
 
   it('key and derive receive the typed node', () => {
-    const T = defineBlock({ name: 'z', props: { src: s.string() }, data: ({ props }) => ({ upper: props.src.toUpperCase() }) })
+    const T = defineBlock({
+      name: 'z',
+      props: { src: s.string() },
+      data: ({ props }) => ({ upper: props.src.toUpperCase() }),
+    })
       .key((node) => {
         expectTypeOf(node.props.src).toEqualTypeOf<string>();
         expectTypeOf(node.data.upper).toEqualTypeOf<string>();
         expectTypeOf(node.type).toEqualTypeOf<'z'>();
         return node.props.src;
       })
-      .derive(async (node) => ({ len: node.props.src.length + node.data.upper.length }));
+      .derive(async (node) => ({
+        len: node.props.src.length + node.data.upper.length,
+      }));
     expectTypeOf<NodeOf<typeof T>['data']>().toEqualTypeOf<{ upper: string }>();
-    expectTypeOf<ReturnType<NonNullable<typeof T.def.derive>>>().toEqualTypeOf<{ len: number } | Promise<{ len: number }>>();
+    expectTypeOf<ReturnType<NonNullable<typeof T.def.derive>>>().toEqualTypeOf<
+      { len: number } | Promise<{ len: number }>
+    >();
   });
 });
 
@@ -158,9 +193,13 @@ describe('JSX typing', () => {
 
   it('rejects wrong usage', () => {
     // @ts-expect-error missing required $
-    <Theorem title="T"><P>x</P></Theorem>;
+    <Theorem title="T">
+      <P>x</P>
+    </Theorem>;
     // @ts-expect-error ref handle of another tag
-    <Theorem $={refs.par} title="T"><P>x</P></Theorem>;
+    <Theorem $={refs.par} title="T">
+      <P>x</P>
+    </Theorem>;
     // @ts-expect-error $ forbidden on non-referable tags
     <Qed $="x" />;
     // @ts-expect-error children forbidden
@@ -194,7 +233,11 @@ describe('JSX typing', () => {
   });
 
   it('direct calls are typed like JSX', () => {
-    const node = Theorem({ $: refs.thm, title: 'T', children: P({ children: 'x' }) });
+    const node = Theorem({
+      $: refs.thm,
+      title: 'T',
+      children: P({ children: 'x' }),
+    });
     expectTypeOf(node).toEqualTypeOf<NodeOf<typeof Theorem>>();
     expectTypeOf(node.data.slug).toEqualTypeOf<string>();
     // @ts-expect-error title required

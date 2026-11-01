@@ -36,8 +36,8 @@ Requirements: Node.js 20+ (or Bun), TypeScript 5.5+ (TypeScript 7 works), ESM.
   "compilerOptions": {
     "jsx": "react-jsx",
     "jsxImportSource": "tsprose",
-    "types": ["tsprose/externals"] // optional ambient helpers
-  }
+    "types": ["tsprose/externals"], // optional ambient helpers
+  },
 }
 ```
 
@@ -53,21 +53,30 @@ import { defineBlock, defineInline, s } from 'tsprose';
 const Image = defineBlock({
   name: 'image',
   props: { src: s.string(), width: s.optional(s.number()) }, // any Standard Schema value works (Zod, Valibot, ArkType…)
-  children: { of: [Caption], min: 0, max: 1 },               // 'none' | 'inline' | 'block' | 'any' | Tag[] | () => Tag[] | { of, min, max, pattern, counts }
-  ref: 'optional',                                            // 'none' | 'optional' | 'required' ($ prop)
+  children: { of: [Caption], min: 0, max: 1 }, // 'none' | 'inline' | 'block' | 'any' | Tag[] | () => Tag[] | { of, min, max, pattern, counts }
+  ref: 'optional', // 'none' | 'optional' | 'required' ($ prop)
   data: ({ props }) => ({ file: props.src.split('/').pop() }),
 })
-  .key((node) => node.props.src)                              // human readable id base (slugified by compile)
-  .derive(async (node, ctx) => probe(node.props.src));        // async data computed by compile, overridable per compile
+  .key((node) => node.props.src) // human readable id base (slugified by compile)
+  .derive(async (node, ctx) => probe(node.props.src)); // async data computed by compile, overridable per compile
 
-const H1 = Heading.with({ level: 1 });                        // presets
+const H1 = Heading.with({ level: 1 }); // presets
 ```
 
 Recursive or mutually recursive tags use the explicit form:
 
 ```ts
-interface ItemDef extends BlockDef<'item', {}, () => readonly (Tag<ItemDef> | typeof P)[], 'optional'> {}
-const Item: Tag<ItemDef> = defineBlock<ItemDef>({ name: 'item', ref: 'optional', children: () => [Item, P] });
+interface ItemDef extends BlockDef<
+  'item',
+  {},
+  () => readonly (Tag<ItemDef> | typeof P)[],
+  'optional'
+> {}
+const Item: Tag<ItemDef> = defineBlock<ItemDef>({
+  name: 'item',
+  ref: 'optional',
+  children: () => [Item, P],
+});
 ```
 
 Tags never throw: invalid props, forbidden children, a missing `$` and so on land in `node.diagnostics` with the source
@@ -79,14 +88,25 @@ More definition tools:
 const Exercise = defineBlock({
   name: 'exercise',
   // One schema for the whole props object: exactly one of the prop sets (types forbid mixing them too).
-  props: s.exclusive(s.object({ /** Generated */ generator: generatorSchema }), s.object({ /** Static */ title: s.string() })),
+  props: s.exclusive(
+    s.object({ /** Generated */ generator: generatorSchema }),
+    s.object({ /** Static */ title: s.string() }),
+  ),
   // Order-free occurrence limits next to (or instead of) a sequence `pattern`.
-  children: { of: [Statement, Hint, Answer], counts: { statement: 1, answer: [0, 1] }, min: 0 },
+  children: {
+    of: [Statement, Hint, Answer],
+    counts: { statement: 1, answer: [0, 1] },
+    min: 0,
+  },
   // Rewrite children before validation: generated content, wrapping loose content, reordering.
-  normalize: ({ props, children }) => ('generator' in props && props.generator ? props.generator.render() : children),
+  normalize: ({ props, children }) =>
+    'generator' in props && props.generator
+      ? props.generator.render()
+      : children,
   // Report problems from data() instead of throwing (errors or warnings, with the element's position).
   data: ({ props, report }) => {
-    if (!('generator' in props)) report('exercise/static', 'Static exercise', 'warning');
+    if (!('generator' in props))
+      report('exercise/static', 'Static exercise', 'warning');
     return {};
   },
   transient: ['generator'], // validated and passed to normalize/data, but not stored on the node
@@ -106,11 +126,15 @@ A kit adds common props, typed meta, paragraph autowrap and hooks to every tag o
 ```ts
 const { defineBlock, defineInline, adopt } = createTagKit({
   common: { refable: { toc: s.optional(s.union(s.boolean(), s.string())) } }, // typed common props
-  meta: { title: s.optional(s.string()) },                                   // typed meta fields
-  wrapLooseInline: P,                                                        // loose text in a block container → <P>
-  key: (node) => node.meta.title as string | undefined,                      // default id base
-  onElement({ node, props }) { /* derive meta */ },
-  onInclude(node) { /* adjust transcluded copies */ },
+  meta: { title: s.optional(s.string()) }, // typed meta fields
+  wrapLooseInline: P, // loose text in a block container → <P>
+  key: (node) => node.meta.title as string | undefined, // default id base
+  onElement({ node, props }) {
+    /* derive meta */
+  },
+  onInclude(node) {
+    /* adjust transcluded copies */
+  },
 });
 ```
 
@@ -134,12 +158,23 @@ name (a handle from `defineRefs` or a plain string).
 ## Compiling
 
 ```ts
-const result = await compile(document, { documentId: 'geometry/pythagoras', kit, hooks, numbering, derive });
+const result = await compile(document, {
+  documentId: 'geometry/pythagoras',
+  kit,
+  hooks,
+  numbering,
+  derive,
+});
 result.refs.get('pythagoras')!.id; // "pythagoras"
-result.diagnostics;                // every problem at once, with positions and tree paths
+result.diagnostics; // every problem at once, with positions and tree paths
 
-const corpus = new Corpus().add('geometry/article', article).add(summary /* own id */);
-const { results, index, diagnostics } = await compileCorpus(corpus, { kit, hooks });
+const corpus = new Corpus()
+  .add('geometry/article', article)
+  .add(summary /* own id */);
+const { results, index, diagnostics } = await compileCorpus(corpus, {
+  kit,
+  hooks,
+});
 ```
 
 Phases: evaluate and normalize the root → resolve `<Include>`s → collect node diagnostics → ids and content hashes →
@@ -176,18 +211,20 @@ with the integrator.
 const { index } = await compileCorpus(corpus, {
   index: {
     kinds: { generalizes: 'none' }, // include → recompile, others → rederive by default
-    dangling: (edge) => (edge.target.documentId.startsWith('ext:') ? 'ignore' : 'error'),
+    dangling: (edge) =>
+      edge.target.documentId.startsWith('ext:') ? 'ignore' : 'error',
   },
 });
 index.declare('section/limits', { names: { intro: 'paragraph' } }); // targets without content
-index.alias('old/id', 'new/id');                                    // moved documents
+index.alias('old/id', 'new/id'); // moved documents
 
-index.validate();                                  // ref/missing-document, ref/missing-target, ref/type-mismatch
+index.validate(); // ref/missing-document, ref/missing-target, ref/type-mismatch
 index.incoming('theorems/pythagoras', { kinds: ['uses'] }); // back references
-index.outgoing('guide/intro', 'install');          // references inside one element
-index.affected(['theorems/pythagoras']);           // Map: id → 'recompile' | 'rederive' | 'revalidate'
-index.resolve(ref('guide/intro', 'install'));      // { address, document, target: { type, id, path } }
-index.toJSON(); CorpusIndex.fromJSON(json);         // persist; updateFromJSON(proseJson) indexes stored prose
+index.outgoing('guide/intro', 'install'); // references inside one element
+index.affected(['theorems/pythagoras']); // Map: id → 'recompile' | 'rederive' | 'revalidate'
+index.resolve(ref('guide/intro', 'install')); // { address, document, target: { type, id, path } }
+index.toJSON();
+CorpusIndex.fromJSON(json); // persist; updateFromJSON(proseJson) indexes stored prose
 
 writeFileSync('corpus.d.ts', generateRegistryTypes(index.registryEntries())); // or registryEntriesFromCorpus(corpus)
 ```
@@ -204,11 +241,15 @@ strings, references as `{ $ref }`, nested nodes as `{ $node }`.
 Values that depend on the whole corpus (link titles, back references) belong to serve time:
 
 ```ts
-const served = await deriveJSON(json, { link: (node, ctx) => describe(ctx.resolve?.(node.props.to)) }, {
-  resolve: index.resolver(),
-  cache,          // per build; failures are not cached
-  onError: log,
-});
+const served = await deriveJSON(
+  json,
+  { link: (node, ctx) => describe(ctx.resolve?.(node.props.to)) },
+  {
+    resolve: index.resolver(),
+    cache, // per build; failures are not cached
+    onError: log,
+  },
+);
 ```
 
 `deriveJSON` uses the same derive keys as `compile`, so caches can be shared.
@@ -232,16 +273,16 @@ formatter and the analyzer read, so tooling never has to execute prose.
 
 Every diagnostic has `severity`, a stable `code`, a `message`, the source `pos` and the tree `path`.
 
-| Area | Codes |
-| --- | --- |
-| props | `props/invalid` |
-| children | `children/forbidden`, `children/kind`, `children/type`, `children/count`, `children/arity`, `children/pattern`, `children/invalid` |
-| refs | `ref/invalid`, `ref/forbidden`, `ref/required`, `ref/mismatch`, `ref/foreign`, `ref/duplicate`, `ref/collision`, `ref/unused`, `ref/unresolved` |
-| corpus | `ref/missing-document`, `ref/missing-target`, `ref/type-mismatch` (from `index.validate()`) |
-| include | `include/self`, `include/whole-document`, `include/unresolved`, `include/cycle`, `include/failed`, `include/missing` |
-| document | `document/threw`, `document/loose-inline` |
-| json | `json/unknown-type` (`fromJSON` with a prose instance) |
-| tag callbacks | `tag/key`, `tag/data`, `tag/normalize`, `tag/hook`, `tag/component`, `hook/failed`, `derive/failed` |
+| Area          | Codes                                                                                                                                           |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| props         | `props/invalid`                                                                                                                                 |
+| children      | `children/forbidden`, `children/kind`, `children/type`, `children/count`, `children/arity`, `children/pattern`, `children/invalid`              |
+| refs          | `ref/invalid`, `ref/forbidden`, `ref/required`, `ref/mismatch`, `ref/foreign`, `ref/duplicate`, `ref/collision`, `ref/unused`, `ref/unresolved` |
+| corpus        | `ref/missing-document`, `ref/missing-target`, `ref/type-mismatch` (from `index.validate()`)                                                     |
+| include       | `include/self`, `include/whole-document`, `include/unresolved`, `include/cycle`, `include/failed`, `include/missing`                            |
+| document      | `document/threw`, `document/loose-inline`                                                                                                       |
+| json          | `json/unknown-type` (`fromJSON` with a prose instance)                                                                                          |
+| tag callbacks | `tag/key`, `tag/data`, `tag/normalize`, `tag/hook`, `tag/component`, `hook/failed`, `derive/failed`                                             |
 
 `formatDiagnostics(diagnostics)` prints them as `file:line:column`, `throw new TSProseError(…)` carries them.
 

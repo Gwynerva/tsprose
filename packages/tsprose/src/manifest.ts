@@ -1,4 +1,9 @@
-import { resolveChildrenRule, type BaseDef, type Kind, type RefMode } from './def.js';
+import {
+  resolveChildrenRule,
+  type BaseDef,
+  type Kind,
+  type RefMode,
+} from './def.js';
 import { propKeys } from './standard.js';
 import { isTag, isTextTemplate, type AnyTag } from './tag.js';
 
@@ -22,7 +27,8 @@ export interface ChildrenDescription {
   /** `null` = unlimited. */
   readonly max: number | null;
   readonly pattern?: string | undefined;
-  readonly counts?: Readonly<Record<string, readonly [number, number | null]>> | undefined;
+  readonly counts?:
+    Readonly<Record<string, readonly [number, number | null]>> | undefined;
   /** `inline` when only inline content is accepted: a blank line inside is a space, not a paragraph break. */
   readonly context: 'none' | 'inline' | 'block' | 'mixed';
 }
@@ -55,7 +61,11 @@ interface DefCarrierLike {
 function carriesDef(value: unknown): value is DefCarrierLike {
   if (typeof value !== 'function') return false;
   const def = (value as { def?: BaseDef }).def;
-  return !!def && typeof def.name === 'string' && (def.kind === 'block' || def.kind === 'inline');
+  return (
+    !!def &&
+    typeof def.name === 'string' &&
+    (def.kind === 'block' || def.kind === 'inline')
+  );
 }
 
 /**
@@ -63,14 +73,17 @@ function carriesDef(value: unknown): value is DefCarrierLike {
  * (`Object.assign(Figure, { Caption })` → `Figure.Caption`). Only values carrying a tag definition are kept:
  * tags, `Tag.template()` functions and components with a `def`.
  */
-export function collectTags(entries: Readonly<Record<string, unknown>>): Record<string, DefCarrierLike> {
+export function collectTags(
+  entries: Readonly<Record<string, unknown>>,
+): Record<string, DefCarrierLike> {
   const out: Record<string, DefCarrierLike> = {};
   const visit = (name: string, value: unknown, depth: number) => {
     if (!carriesDef(value)) return;
     out[name] = value;
     if (depth > 2) return;
     for (const [member, inner] of Object.entries(value)) {
-      if (member === 'def' || member === 'tag' || !/^[A-Z]/.test(member)) continue;
+      if (member === 'def' || member === 'tag' || !/^[A-Z]/.test(member))
+        continue;
       visit(`${name}.${member}`, inner, depth + 1);
     }
   };
@@ -79,7 +92,9 @@ export function collectTags(entries: Readonly<Record<string, unknown>>): Record<
 }
 
 /** Describe tags (see {@link TagsDescription}). Accepts the same maps as {@link collectTags}. */
-export function describeTags(entries: Readonly<Record<string, unknown>>): TagsDescription {
+export function describeTags(
+  entries: Readonly<Record<string, unknown>>,
+): TagsDescription {
   const tags: Record<string, TagDescription> = {};
   for (const [name, carrier] of Object.entries(collectTags(entries))) {
     const def = carrier.def;
@@ -101,18 +116,34 @@ export function describeTags(entries: Readonly<Record<string, unknown>>): TagsDe
         max: Number.isFinite(rule.max) ? rule.max : null,
         ...(rule.pattern ? { pattern: rule.pattern.source } : {}),
         ...(rule.counts
-          ? { counts: Object.fromEntries([...rule.counts].map(([t, [min, max]]) => [t, [min, Number.isFinite(max) ? max : null] as const])) }
+          ? {
+              counts: Object.fromEntries(
+                [...rule.counts].map(([t, [min, max]]) => [
+                  t,
+                  [min, Number.isFinite(max) ? max : null] as const,
+                ]),
+              ),
+            }
           : {}),
         context: rule.context,
       },
       wrapsLooseInline: wraps,
       normalizes: typeof def.normalize === 'function',
-      usage: isTag(carrier) ? 'tag' : isTextTemplate(carrier) ? 'template' : 'component',
+      usage: isTag(carrier)
+        ? 'tag'
+        : isTextTemplate(carrier)
+          ? 'template'
+          : 'component',
     };
   }
   return { version: 1, tags };
 }
 
 export function isTagsDescription(value: unknown): value is TagsDescription {
-  return typeof value === 'object' && value !== null && (value as TagsDescription).version === 1 && typeof (value as TagsDescription).tags === 'object';
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    (value as TagsDescription).version === 1 &&
+    typeof (value as TagsDescription).tags === 'object'
+  );
 }

@@ -35,17 +35,37 @@ function kinds(jsx: string): string[] {
 
 describe('classifyJsxChild', () => {
   it.each([
-    ['text and whitespace', '<P>\n  word\n  <B>b</B>\n</P>', ['text', 'element', 'whitespace']],
+    [
+      'text and whitespace',
+      '<P>\n  word\n  <B>b</B>\n</P>',
+      ['text', 'element', 'whitespace'],
+    ],
     ['explicit space', "<P>a{' '}b</P>", ['text', 'space', 'text']],
-    ['whitespace-only strings are spaces', "<P>a{'\\n  '}b</P>", ['text', 'space', 'text']],
+    [
+      'whitespace-only strings are spaces',
+      "<P>a{'\\n  '}b</P>",
+      ['text', 'space', 'text'],
+    ],
     ['glue', '<P>a{""}b</P>', ['text', 'glue', 'text']],
     ['paragraph break', '<P>a{"\\u2029"}b</P>', ['text', 'break', 'text']],
     ['comment', '<P>a{/* c */}b</P>', ['text', 'comment', 'text']],
     ['static strings', "<P>{'x'}</P>", ['string']],
-    ['templates without substitutions classify like strings', '<P>{` `}{``}{`\\u2029`}{`x`}</P>', ['space', 'glue', 'break', 'string']],
+    [
+      'templates without substitutions classify like strings',
+      '<P>{` `}{``}{`\\u2029`}{`x`}</P>',
+      ['space', 'glue', 'break', 'string'],
+    ],
     ['templates with substitutions', '<P>{`a${b}`}</P>', ['template']],
-    ['other literals', '<P>{1}{null}{true}</P>', ['literal', 'literal', 'literal']],
-    ['elements, fragments, expressions', '<P><B>b</B><>f</>{x}{f()}</P>', ['element', 'fragment', 'expression', 'expression']],
+    [
+      'other literals',
+      '<P>{1}{null}{true}</P>',
+      ['literal', 'literal', 'literal'],
+    ],
+    [
+      'elements, fragments, expressions',
+      '<P><B>b</B><>f</>{x}{f()}</P>',
+      ['element', 'fragment', 'expression', 'expression'],
+    ],
   ])('%s', (_name, jsx, expected) => {
     expect(kinds(jsx)).toEqual(expected);
   });
@@ -81,7 +101,9 @@ describe('parseProse', () => {
 
   it('reads `<T>x` in .ts files as a type assertion, not JSX', () => {
     expect(parseProse('const y = <string>x;', 'a.ts').errors).toEqual([]);
-    expect(parseProse('const y = <string>x;', 'a.tsx').errors.length).toBeGreaterThan(0);
+    expect(
+      parseProse('const y = <string>x;', 'a.tsx').errors.length,
+    ).toBeGreaterThan(0);
   });
 });
 
@@ -111,14 +133,23 @@ describe('line endings', () => {
     const source = 'a\r\nb\rc\nd';
     const starts = computeLineStarts(source);
     expect(starts).toEqual([0, 3, 5, 7]);
-    expect(positionOf(starts, source.indexOf('d'))).toEqual({ line: 4, column: 1 });
+    expect(positionOf(starts, source.indexOf('d'))).toEqual({
+      line: 4,
+      column: 1,
+    });
   });
 
   it('BLANK_RUN: CRLF is not a blank line, two of them are', () => {
     expect(hasBlankLine('a\r\nb')).toBe(false);
     expect(hasBlankLine('a\r\n  \r\nb')).toBe(true);
     expect(hasBlankLine('a\r\rb')).toBe(true);
-    expect('a\n\nb\n \nc'.split(BLANK_RUN)).toEqual(['a', '\n\n', 'b', '\n \n', 'c']);
+    expect('a\n\nb\n \nc'.split(BLANK_RUN)).toEqual([
+      'a',
+      '\n\n',
+      'b',
+      '\n \n',
+      'c',
+    ]);
   });
 });
 
@@ -141,7 +172,9 @@ describe('files and config', () => {
     const files: string[] = [];
     for await (const file of walkProseFiles(dir)) files.push(file);
     expect(files).toEqual([join(dir, 'a.tsx')]);
-    expect(await missingPaths([dir, join(dir, 'nope')])).toEqual([join(dir, 'nope')]);
+    expect(await missingPaths([dir, join(dir, 'nope')])).toEqual([
+      join(dir, 'nope'),
+    ]);
   });
 
   it('loads a JSON tags description as { manifest }', async () => {
@@ -156,8 +189,14 @@ describe('files and config', () => {
 
   it('resolves a manifest path relative to the config and warns about conflicting keys', async () => {
     const dir = await tempDir();
-    await writeFile(join(dir, 'tags.json'), JSON.stringify({ version: 1, tags: {} }));
-    await writeFile(join(dir, 'tsprose.config.mjs'), "export default { manifest: './tags.json', inlineTags: ['B'], compactContainers: ['Table'], printWidth: 80 };");
+    await writeFile(
+      join(dir, 'tags.json'),
+      JSON.stringify({ version: 1, tags: {} }),
+    );
+    await writeFile(
+      join(dir, 'tsprose.config.mjs'),
+      "export default { manifest: './tags.json', inlineTags: ['B'], compactContainers: ['Table'], printWidth: 80 };",
+    );
     const loaded = await loadTsproseConfig(join(dir, 'tsprose.config.mjs'));
     expect(loaded.config.manifest).toEqual({ version: 1, tags: {} });
     expect(loaded.config.printWidth).toBe(80);

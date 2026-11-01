@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { Fragment, isFragmentNode, isTextNode, type BaseNode, type AnyNode } from 'tsprose';
+import {
+  Fragment,
+  isFragmentNode,
+  isTextNode,
+  type BaseNode,
+  type AnyNode,
+} from 'tsprose';
 import { B, P, Qed, Sec, Theorem } from '../fixtures/tags.js';
 
 const text = (n: AnyNode) => (isTextNode(n) ? n.text : `<${n.type}>`);
@@ -8,7 +14,10 @@ describe('JSX runtime', () => {
   it('tags produce nodes with source positions (jsxDEV)', () => {
     const node = <P center>Hello</P>;
     expect(node.type).toBe('paragraph');
-    expect(node.pos).toMatchObject({ line: expect.any(Number), column: expect.any(Number) });
+    expect(node.pos).toMatchObject({
+      line: expect.any(Number),
+      column: expect.any(Number),
+    });
     expect(node.pos!.file).toMatch(/jsx\.test\.tsx$/);
   });
 
@@ -97,7 +106,11 @@ describe('JSX runtime', () => {
     expect(node.ref).toBe('pyth');
     expect(node.children!.map(text)).toEqual(['<paragraph>', '<qed>']);
     const p = node.children![0] as BaseNode;
-    expect(p.children!.map(text)).toEqual(['In a right triangle ', '<bold>', '.']);
+    expect(p.children!.map(text)).toEqual([
+      'In a right triangle ',
+      '<bold>',
+      '.',
+    ]);
   });
 });
 
@@ -105,7 +118,11 @@ describe('hidden position prop (transform positions)', () => {
   it('jsx() reads __tsprosePos into node.pos and strips it from props', async () => {
     const { jsx } = await import('tsprose/jsx-runtime');
     const { P } = await import('../fixtures/tags.js');
-    const node = jsx(P, { center: true, children: 'x', __tsprosePos: ['doc.tsx', 12, 5] }) as import('tsprose').BaseNode;
+    const node = jsx(P, {
+      center: true,
+      children: 'x',
+      __tsprosePos: ['doc.tsx', 12, 5],
+    }) as import('tsprose').BaseNode;
     expect(node.pos).toEqual({ file: 'doc.tsx', line: 12, column: 5 });
     expect(node.props).toEqual({ center: true });
     expect(node.diagnostics ?? []).toEqual([]);
@@ -114,7 +131,15 @@ describe('hidden position prop (transform positions)', () => {
   it('positions reach diagnostics', async () => {
     const { jsx } = await import('tsprose/jsx-runtime');
     const { P } = await import('../fixtures/tags.js');
-    const node = jsx(P, { center: 'yes', children: 'x', __tsprosePos: ['doc.tsx', 3, 7] }) as import('tsprose').BaseNode;
-    expect(node.diagnostics?.[0]?.pos).toEqual({ file: 'doc.tsx', line: 3, column: 7 });
+    const node = jsx(P, {
+      center: 'yes',
+      children: 'x',
+      __tsprosePos: ['doc.tsx', 3, 7],
+    }) as import('tsprose').BaseNode;
+    expect(node.diagnostics?.[0]?.pos).toEqual({
+      file: 'doc.tsx',
+      line: 3,
+      column: 7,
+    });
   });
 });

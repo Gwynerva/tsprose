@@ -1,5 +1,9 @@
 import { readFile } from 'node:fs/promises';
-import { computeLineStarts, parseProse, positionOf } from '@tsprose/transform/tooling';
+import {
+  computeLineStarts,
+  parseProse,
+  positionOf,
+} from '@tsprose/transform/tooling';
 import { forEachJsxElement, type EsNode } from './estree.js';
 import { checkChildren } from './rules/children.js';
 import { checkProps } from './rules/props.js';
@@ -15,21 +19,38 @@ export interface AnalyzeOptions {
   readonly rules?: readonly RuleName[] | undefined;
 }
 
-export const ALL_RULES: readonly RuleName[] = ['children', 'props', 'refs', 'whitespace', 'braces'];
+export const ALL_RULES: readonly RuleName[] = [
+  'children',
+  'props',
+  'refs',
+  'whitespace',
+  'braces',
+];
 
 /** Run the rules over an already parsed ESTree program (used by the CLI and the ESLint plugin). */
-export function analyzeProgram(program: EsNode, source: string, fileName: string, options: AnalyzeOptions): Finding[] {
+export function analyzeProgram(
+  program: EsNode,
+  source: string,
+  fileName: string,
+  options: AnalyzeOptions,
+): Finding[] {
   const rules = new Set(options.rules ?? ALL_RULES);
   const findings: Finding[] = [];
   if (rules.has('children') || rules.has('props')) {
     forEachJsxElement(program, (element) => {
-      if (rules.has('children')) findings.push(...checkChildren(element, source, options.manifest));
-      if (rules.has('props')) findings.push(...checkProps(element, options.manifest));
+      if (rules.has('children'))
+        findings.push(...checkChildren(element, source, options.manifest));
+      if (rules.has('props'))
+        findings.push(...checkProps(element, options.manifest));
     });
   }
   if (rules.has('refs')) findings.push(...checkRefs(program));
-  if (rules.has('whitespace')) findings.push(...checkWhitespace(program, source, fileName, options.manifest));
-  if (rules.has('braces')) findings.push(...checkBraces(program, source, options.manifest));
+  if (rules.has('whitespace'))
+    findings.push(
+      ...checkWhitespace(program, source, fileName, options.manifest),
+    );
+  if (rules.has('braces'))
+    findings.push(...checkBraces(program, source, options.manifest));
   return findings.sort((a, b) => a.range[0] - b.range[0]);
 }
 
@@ -37,19 +58,33 @@ export function analyzeProgram(program: EsNode, source: string, fileName: string
  * Parse and analyze one file. A file with parse errors gets no findings (the recovered AST would produce noise and
  * unsafe fixes): only `errors`.
  */
-export function analyzeSource(source: string, fileName: string, options: AnalyzeOptions): { findings: Located[]; errors: string[] } {
+export function analyzeSource(
+  source: string,
+  fileName: string,
+  options: AnalyzeOptions,
+): { findings: Located[]; errors: string[] } {
   const parsed = parseProse(source, fileName);
   const errors = parsed.errors.map((e) => e.message);
   if (errors.length) return { findings: [], errors };
   const findings = analyzeProgram(parsed.program, source, fileName, options);
   const lineStarts = computeLineStarts(source);
   return {
-    findings: findings.map((f) => ({ ...f, file: fileName, ...positionOf(lineStarts, f.range[0]) })),
+    findings: findings.map((f) => ({
+      ...f,
+      file: fileName,
+      ...positionOf(lineStarts, f.range[0]),
+    })),
     errors,
   };
 }
 
-export async function analyzeFiles(files: readonly string[], options: AnalyzeOptions): Promise<{ findings: Located[]; errors: { file: string; message: string }[] }> {
+export async function analyzeFiles(
+  files: readonly string[],
+  options: AnalyzeOptions,
+): Promise<{
+  findings: Located[];
+  errors: { file: string; message: string }[];
+}> {
   const findings: Located[] = [];
   const errors: { file: string; message: string }[] = [];
   for (const file of files) {
@@ -62,8 +97,13 @@ export async function analyzeFiles(files: readonly string[], options: AnalyzeOpt
 }
 
 /** Apply fixes to a source (non-overlapping, last to first). */
-export function applyFixes(source: string, findings: readonly Finding[]): string {
-  const fixes = findings.flatMap((f) => (f.fix ? [f.fix] : [])).sort((a, b) => b.range[0] - a.range[0]);
+export function applyFixes(
+  source: string,
+  findings: readonly Finding[],
+): string {
+  const fixes = findings
+    .flatMap((f) => (f.fix ? [f.fix] : []))
+    .sort((a, b) => b.range[0] - a.range[0]);
   let out = source;
   let lastStart = Number.POSITIVE_INFINITY;
   for (const fix of fixes) {
@@ -87,7 +127,11 @@ export function fixSource(
   let code = source;
   let result = analyzeSource(code, fileName, options);
   let passes = 0;
-  while (passes < maxPasses && !result.errors.length && result.findings.some((f) => f.fix)) {
+  while (
+    passes < maxPasses &&
+    !result.errors.length &&
+    result.findings.some((f) => f.fix)
+  ) {
     const next = applyFixes(code, result.findings);
     if (next === code) break;
     const nextResult = analyzeSource(next, fileName, options);

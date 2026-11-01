@@ -7,13 +7,20 @@ import type { TocItem } from '../src/hooks.js';
 
 const root = join(import.meta.dirname, '..', 'content');
 const brokenRoot = join(import.meta.dirname, '..', 'content-broken');
-const importer = (file: string) => import(/* @vite-ignore */ file.replace(/\\/g, '/')) as Promise<Record<string, unknown>>;
+const importer = (file: string) =>
+  import(/* @vite-ignore */ file.replace(/\\/g, '/')) as Promise<
+    Record<string, unknown>
+  >;
 
 describe('testbed site build', async () => {
   const site = await buildSite(root, { importer });
   const byId = new Map(site.built.map((d) => [d.id, d]));
-  const article = byId.get('foundations/equations/quadratic/quadratic-formula/article')!;
-  const summary = byId.get('foundations/equations/quadratic/quadratic-formula/summary')!;
+  const article = byId.get(
+    'foundations/equations/quadratic/quadratic-formula/article',
+  )!;
+  const summary = byId.get(
+    'foundations/equations/quadratic/quadratic-formula/summary',
+  )!;
 
   it('compiles every document without errors', () => {
     expect(site.stats.errors).toBe(0);
@@ -32,7 +39,12 @@ describe('testbed site build', async () => {
     expect(ids).toContain('square-root-example');
     expect(ids).toContain('cover');
     expect(ids).toContain('formula-korney');
-    const headings = ids.filter((id) => id.startsWith('formula-korney') || id === 'diskriminant' || id === 'formula');
+    const headings = ids.filter(
+      (id) =>
+        id.startsWith('formula-korney') ||
+        id === 'diskriminant' ||
+        id === 'formula',
+    );
     expect(headings.length).toBeGreaterThan(0);
   });
 
@@ -43,7 +55,13 @@ describe('testbed site build', async () => {
     const toc = article.result.hooks.get('toc') as TocItem[];
     expect(toc.map((t) => t.title)).toEqual(['Формула корней']);
     // toc-marked elements nest under the nearest heading
-    expect(toc[0]!.children.map((t) => [t.type, t.title, t.children.map((c) => [c.type, c.title])])).toEqual([
+    expect(
+      toc[0]!.children.map((t) => [
+        t.type,
+        t.title,
+        t.children.map((c) => [c.type, c.title]),
+      ]),
+    ).toEqual([
       ['heading', 'Дискриминант', [['diagram', 'Обзор']]],
       ['heading', 'Формула', [['table', 'Случаи дискриминанта']]],
     ]);
@@ -56,23 +74,41 @@ describe('testbed site build', async () => {
   it('loose inline content is wrapped in paragraphs by the kit', () => {
     const li = select(article.result.root, Image);
     expect(li.length).toBe(1);
-    const lists = article.result.root.children!.filter((c) => c.type === 'list') as BaseNode[];
+    const lists = article.result.root.children!.filter(
+      (c) => c.type === 'list',
+    ) as BaseNode[];
     const items = lists[0]!.children as BaseNode[];
     expect(items[1]!.children!.map((c) => c.type)).toEqual(['paragraph']);
   });
 
   it('cross-document links resolve and back references are indexed', () => {
     const targets = article.result.outgoing.map((o) => o.target);
-    expect(targets).toContainEqual({ documentId: 'foundations/equations/quadratic/completing-the-square/article', name: 'method' });
-    expect(targets).toContainEqual({ documentId: 'foundations/equations/quadratic/quadratic-formula/article', name: 'formula' });
-    expect(site.index.incoming({ documentId: 'foundations/equations/quadratic/completing-the-square/article', name: 'method' }).length).toBeGreaterThan(0);
+    expect(targets).toContainEqual({
+      documentId:
+        'foundations/equations/quadratic/completing-the-square/article',
+      name: 'method',
+    });
+    expect(targets).toContainEqual({
+      documentId: 'foundations/equations/quadratic/quadratic-formula/article',
+      name: 'formula',
+    });
+    expect(
+      site.index.incoming({
+        documentId:
+          'foundations/equations/quadratic/completing-the-square/article',
+        name: 'method',
+      }).length,
+    ).toBeGreaterThan(0);
   });
 
   it('summary transcludes compiled copies', () => {
     const types = summary.result.root.children!.map((c) => c.type);
     expect(types).toEqual(['heading', 'paragraph', 'statement', 'term']);
     const copy = summary.result.root.children![2] as BaseNode;
-    expect(copy.meta.includedFrom).toEqual({ documentId: 'foundations/equations/quadratic/quadratic-formula/article', name: 'formula' });
+    expect(copy.meta.includedFrom).toEqual({
+      documentId: 'foundations/equations/quadratic/quadratic-formula/article',
+      name: 'formula',
+    });
     expect(copy.meta.toc).toBeUndefined();
     expect(copy.id).toBe('formula-korney');
     expect(summary.result.diagnostics).toEqual([]);
@@ -80,23 +116,37 @@ describe('testbed site build', async () => {
 
   it('derive ran for math, images and problems', () => {
     const [img] = select(article.result.root, Image);
-    expect(article.result.derived.get(img!.derived!)).toEqual({ width: 800, height: 600 });
+    expect(article.result.derived.get(img!.derived!)).toEqual({
+      width: 800,
+      height: 600,
+    });
     const maths = select(article.result.root, M);
     expect(maths.length).toBeGreaterThan(5);
-    expect(article.result.derived.get(maths[0]!.derived!)).toMatchObject({ html: expect.stringContaining('katex') });
+    expect(article.result.derived.get(maths[0]!.derived!)).toMatchObject({
+      html: expect.stringContaining('katex'),
+    });
   });
 
   it('renders HTML with ids and resolved links', () => {
-    expect(article.html).toContain('<section class="accent statement" id="formula">');
-    expect(article.html).toContain('href="/foundations/equations/quadratic/completing-the-square/article#method"');
+    expect(article.html).toContain(
+      '<section class="accent statement" id="formula">',
+    );
+    expect(article.html).toContain(
+      'href="/foundations/equations/quadratic/completing-the-square/article#method"',
+    );
     expect(article.html).toContain('<span class="katex">');
     expect(summary.html).toContain('id="formula-korney"');
   });
 
   it('JSON is compact and round-trips', () => {
     expect(article.json).not.toContain('"pos"');
-    expect(article.json).toContain('"$ref":{"documentId":"foundations/equations/quadratic/completing-the-square/article","name":"method"}');
-    const parsed = JSON.parse(article.json) as { v: number; refs: Record<string, string> };
+    expect(article.json).toContain(
+      '"$ref":{"documentId":"foundations/equations/quadratic/completing-the-square/article","name":"method"}',
+    );
+    const parsed = JSON.parse(article.json) as {
+      v: number;
+      refs: Record<string, string>;
+    };
     expect(parsed.v).toBe(2);
     expect(parsed.refs.formula).toBe('formula');
   });
@@ -121,7 +171,16 @@ describe('broken content', async () => {
   it('reports every problem in one pass, with file and line, without stopping', () => {
     const doc = site.built[0]!;
     const codes = doc.result.diagnostics.map((d) => d.code).sort();
-    expect(codes).toEqual(['children/kind', 'children/pattern', 'props/invalid', 'props/unknown', 'ref/required', 'ref/unused'].sort());
+    expect(codes).toEqual(
+      [
+        'children/kind',
+        'children/pattern',
+        'props/invalid',
+        'props/unknown',
+        'ref/required',
+        'ref/unused',
+      ].sort(),
+    );
     for (const d of doc.result.diagnostics.filter((d) => d.pos)) {
       expect(d.pos!.file).toMatch(/content-broken[\\/].*\.tsx$/);
       expect(d.pos!.line).toBeGreaterThan(1);

@@ -15,7 +15,9 @@ try {
 }
 
 const root = join(import.meta.dirname, '..', '..').replace(/\\/g, '/');
-const files = ['test/hover/doc.tsx', 'test/hover/tags.ts'].map((f) => `${root}/${f}`);
+const files = ['test/hover/doc.tsx', 'test/hover/tags.ts'].map(
+  (f) => `${root}/${f}`,
+);
 
 describe.skipIf(!ts)('hover documentation (language service)', () => {
   const T = ts!;
@@ -39,7 +41,10 @@ describe.skipIf(!ts)('hover documentation (language service)', () => {
     {
       getScriptFileNames: () => files,
       getScriptVersion: () => '1',
-      getScriptSnapshot: (f) => (existsSync(f) ? T.ScriptSnapshot.fromString(readFileSync(f, 'utf8')) : undefined),
+      getScriptSnapshot: (f) =>
+        existsSync(f)
+          ? T.ScriptSnapshot.fromString(readFileSync(f, 'utf8'))
+          : undefined,
       getCurrentDirectory: () => root,
       getCompilationSettings: () => options,
       getDefaultLibFileName: (o) => T.getDefaultLibFilePath(o),
@@ -59,7 +64,9 @@ describe.skipIf(!ts)('hover documentation (language service)', () => {
   };
 
   it('shows tag documentation', () => {
-    expect(hover('<P center serif>')).toBe('Paragraph of running text. Accepts only inline content.');
+    expect(hover('<P center serif>')).toBe(
+      'Paragraph of running text. Accepts only inline content.',
+    );
     expect(hover('<Callout')).toBe('A callout box with an icon.');
     expect(hover('<H1>')).toBe('Level-one heading preset.');
   });
@@ -68,14 +75,20 @@ describe.skipIf(!ts)('hover documentation (language service)', () => {
     expect(hover('center serif>')).toBe('Center the paragraph horizontally.');
     expect(hover('serif>')).toBe('Serif font for quotations.');
     expect(hover('icon="info"')).toBe('Icon name from the icon set.');
-    expect(hover('toc="Note"')).toBe('Put the element into the table of contents (true) or with a custom title (string).');
+    expect(hover('toc="Note"')).toBe(
+      'Put the element into the table of contents (true) or with a custom title (string).',
+    );
     // whole-object schema (s.exclusive of s.object members) keeps member prop docs
     expect(hover('answer={42}')).toBe('Expected answer value.');
   });
 
   it('reports a wrong attribute value as a type error', () => {
-    const messages = ls.getSemanticDiagnostics(doc).map((d) => T.flattenDiagnosticMessageText(d.messageText, ' '));
+    const messages = ls
+      .getSemanticDiagnostics(doc)
+      .map((d) => T.flattenDiagnosticMessageText(d.messageText, ' '));
     expect(messages).toHaveLength(1);
-    expect(messages[0]).toContain("Type 'string' is not assignable to type 'boolean | undefined'");
+    expect(messages[0]).toContain(
+      "Type 'string' is not assignable to type 'boolean | undefined'",
+    );
   });
 });

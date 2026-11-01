@@ -40,7 +40,12 @@ export const FRAGMENT_TYPE = 'fragment';
 export const TEXT_TYPE = 'text';
 
 export function isTextNode(value: unknown): value is TextNode {
-  return typeof value === 'object' && value !== null && (value as TextNode).type === TEXT_TYPE && 'text' in value;
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    (value as TextNode).type === TEXT_TYPE &&
+    'text' in value
+  );
 }
 
 export function isBaseNode(value: unknown): value is BaseNode {
@@ -58,12 +63,16 @@ export function isAnyNode(value: unknown): value is AnyNode {
   return isTextNode(value) || isBaseNode(value);
 }
 
-export function isFragmentNode(value: unknown): value is BaseNode & { readonly type: 'fragment' } {
+export function isFragmentNode(
+  value: unknown,
+): value is BaseNode & { readonly type: 'fragment' } {
   return isBaseNode(value) && value.type === FRAGMENT_TYPE;
 }
 
 export function makeTextNode(text: string, pos?: SourcePos): TextNode {
-  return pos ? { type: TEXT_TYPE, kind: 'inline', text, pos } : { type: TEXT_TYPE, kind: 'inline', text };
+  return pos
+    ? { type: TEXT_TYPE, kind: 'inline', text, pos }
+    : { type: TEXT_TYPE, kind: 'inline', text };
 }
 
 //
@@ -71,10 +80,18 @@ export function makeTextNode(text: string, pos?: SourcePos): TextNode {
 //
 
 /** Phantom carrier for `NodeOf`/`MetaOf`: concrete tags expose `def` and (for kits) `__meta`. */
-export type DefOf<T> = T extends { readonly def: infer D extends BaseDef } ? D : never;
-export type MetaOf<T> = T extends { readonly __meta?: infer M } ? (unknown extends M ? {} : NonNullable<M>) : {};
+export type DefOf<T> = T extends { readonly def: infer D extends BaseDef }
+  ? D
+  : never;
+export type MetaOf<T> = T extends { readonly __meta?: infer M }
+  ? unknown extends M
+    ? {}
+    : NonNullable<M>
+  : {};
 
-export type DataOf<D extends BaseDef> = D extends { readonly data?: ((ctx: any) => infer R) | undefined }
+export type DataOf<D extends BaseDef> = D extends {
+  readonly data?: ((ctx: any) => infer R) | undefined;
+}
   ? unknown extends R
     ? undefined
     : R
@@ -123,4 +140,6 @@ export interface Node<D extends BaseDef = BaseDef, M = {}> {
   derived?: string | undefined;
 }
 
-export type NodeOf<T> = T extends { readonly def: infer D extends BaseDef } ? Node<D, MetaOf<T>> : never;
+export type NodeOf<T> = T extends { readonly def: infer D extends BaseDef }
+  ? Node<D, MetaOf<T>>
+  : never;

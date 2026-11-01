@@ -15,21 +15,31 @@ describe('s (built-in schemas)', () => {
     ['record', s.record(s.boolean()), { a: true }, { a: 1 }],
     ['union', s.union(s.string(), s.number()), 1, true],
     ['custom', s.custom<Date>((v) => v instanceof Date), new Date(0), 'd'],
-  ] as [string, Schema<unknown>, unknown, unknown][])('%s', (_n, schema, good, bad) => {
-    expect(runSync(schema, good)).toEqual({ value: good });
-    expect(runSync(schema, bad)).toHaveProperty('issues');
-    expect(() => schema.parse(bad)).toThrow(TypeError);
-  });
+  ] as [string, Schema<unknown>, unknown, unknown][])(
+    '%s',
+    (_n, schema, good, bad) => {
+      expect(runSync(schema, good)).toEqual({ value: good });
+      expect(runSync(schema, bad)).toHaveProperty('issues');
+      expect(() => schema.parse(bad)).toThrow(TypeError);
+    },
+  );
 
   it('object: unknown keys and nested paths', () => {
-    const schema = s.object({ a: s.string(), b: s.optional(s.object({ c: s.number() })) });
+    const schema = s.object({
+      a: s.string(),
+      b: s.optional(s.object({ c: s.number() })),
+    });
     expect(runSync(schema, { a: 'x' })).toEqual({ value: { a: 'x' } });
     const r = runSync(schema, { a: 'x', b: { c: 'no' }, z: 1 });
     expect(r.issues!.map((i) => i.path)).toEqual([['b', 'c'], ['z']]);
   });
 
   it('validateProps separates invalid, unknown and ignored keys', () => {
-    const { value, issues } = validateProps({ a: s.string(), b: s.optional(s.number()) }, { a: 'x', c: 1, $: 'r' }, new Set(['$']));
+    const { value, issues } = validateProps(
+      { a: s.string(), b: s.optional(s.number()) },
+      { a: 'x', c: 1, $: 'r' },
+      new Set(['$']),
+    );
     expect(value).toEqual({ a: 'x' });
     expect(issues).toEqual([{ key: 'c', message: 'Unknown prop "c"' }]);
   });
@@ -38,7 +48,11 @@ describe('s (built-in schemas)', () => {
 describe('compilePattern', () => {
   it.each([
     ['paragraph+ proof? qed?', ['paragraph'], true],
-    ['paragraph+ proof? qed?', ['paragraph', 'paragraph', 'proof', 'qed'], true],
+    [
+      'paragraph+ proof? qed?',
+      ['paragraph', 'paragraph', 'proof', 'qed'],
+      true,
+    ],
     ['paragraph+ proof? qed?', ['proof'], false],
     ['paragraph+ proof? qed?', ['paragraph', 'qed', 'proof'], false],
     ['main section*', ['main'], true],
@@ -61,12 +75,15 @@ describe('compilePattern', () => {
     expect(compilePattern('a.b-c').test(['axb-c'])).toBe(false);
   });
 
-  it.each([['(a', 'missing ")"'], ['a)', 'unexpected ")"'], ['', 'empty'], ['a $ b', 'unexpected character'], ['?a', 'unexpected']])(
-    'rejects %j',
-    (pattern, message) => {
-      expect(() => compilePattern(pattern)).toThrow(message);
-    },
-  );
+  it.each([
+    ['(a', 'missing ")"'],
+    ['a)', 'unexpected ")"'],
+    ['', 'empty'],
+    ['a $ b', 'unexpected character'],
+    ['?a', 'unexpected'],
+  ])('rejects %j', (pattern, message) => {
+    expect(() => compilePattern(pattern)).toThrow(message);
+  });
 
   it('exposes mentioned names', () => {
     expect([...compilePattern('(a | b)+ c?').names]).toEqual(['a', 'b', 'c']);
@@ -83,12 +100,18 @@ describe('hashText', () => {
   it('has no collisions on 50k realistic inputs', () => {
     const seen = new Set<string>();
     for (let i = 0; i < 50_000; i++) {
-      seen.add(hashText(`paragraph:${JSON.stringify({ center: i % 2 === 0 })}:text ${i} ${i * 7919}`));
+      seen.add(
+        hashText(
+          `paragraph:${JSON.stringify({ center: i % 2 === 0 })}:text ${i} ${i * 7919}`,
+        ),
+      );
     }
     expect(seen.size).toBe(50_000);
   });
 
   it('canonicalJson sorts keys and drops undefined', () => {
-    expect(canonicalJson({ b: 1, a: { d: undefined, c: [3, { z: 1, y: 2 }] } })).toBe('{"a":{"c":[3,{"y":2,"z":1}]},"b":1}');
+    expect(
+      canonicalJson({ b: 1, a: { d: undefined, c: [3, { z: 1, y: 2 }] } }),
+    ).toBe('{"a":{"c":[3,{"y":2,"z":1}]},"b":1}');
   });
 });

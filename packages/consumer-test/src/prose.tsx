@@ -1,8 +1,22 @@
 // A small "site dialect" written the way a real integrator would, against the published API.
-import { createTagKit, defineBlock, defineInline, defineRefs, defineDocument, refSchema, s, type BlockDef, type Tag } from 'tsprose';
+import {
+  createTagKit,
+  defineBlock,
+  defineInline,
+  defineRefs,
+  defineDocument,
+  refSchema,
+  s,
+  type BlockDef,
+  type Tag,
+} from 'tsprose';
 
 export const B = defineInline({ name: 'bold', children: 'inline' });
-export const P = defineBlock({ name: 'paragraph', children: 'inline', ref: 'optional' });
+export const P = defineBlock({
+  name: 'paragraph',
+  children: 'inline',
+  ref: 'optional',
+});
 
 export const { defineBlock: block, defineInline: inline } = createTagKit({
   common: { refable: { toc: s.optional(s.union(s.boolean(), s.string())) } },
@@ -21,10 +35,23 @@ export const Theorem = block({
   data: ({ props }) => ({ slug: props.title.toLowerCase() }),
 });
 
-export const Link = inline({ name: 'link', props: { to: refSchema() }, children: 'inline' });
+export const Link = inline({
+  name: 'link',
+  props: { to: refSchema() },
+  children: 'inline',
+});
 
-export interface ItemDef extends BlockDef<'item', {}, () => readonly (Tag<ItemDef> | typeof P)[], 'optional'> {}
-export const Item: Tag<ItemDef> = defineBlock<ItemDef>({ name: 'item', ref: 'optional', children: () => [Item, P] });
+export interface ItemDef extends BlockDef<
+  'item',
+  {},
+  () => readonly (Tag<ItemDef> | typeof P)[],
+  'optional'
+> {}
+export const Item: Tag<ItemDef> = defineBlock<ItemDef>({
+  name: 'item',
+  ref: 'optional',
+  children: () => [Item, P],
+});
 
 export const refs = defineRefs(import.meta.url, { main: Theorem });
 

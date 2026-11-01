@@ -11,7 +11,10 @@ export default defineConfig({
     passWithNoTests: true,
     typecheck: {
       enabled: true,
-      include: ['test/registry/**/*.test-d.ts', 'test/registry/**/*.test-d.tsx'],
+      include: [
+        'test/registry/**/*.test-d.ts',
+        'test/registry/**/*.test-d.tsx',
+      ],
       tsconfig: './tsconfig.registry.json',
       ignoreSourceErrors: false,
     },

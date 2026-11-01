@@ -1,7 +1,13 @@
 import type { DeriveFn } from './compile.js';
 import type { ResolveFn } from './corpus-index.js';
 import type { DeriveContext } from './def.js';
-import { deriveKey, isJsonNodeSlot, nodeFromJSON, type JsonNode, type ProseJSON } from './json.js';
+import {
+  deriveKey,
+  isJsonNodeSlot,
+  nodeFromJSON,
+  type JsonNode,
+  type ProseJSON,
+} from './json.js';
 import type { BaseNode } from './node.js';
 import { runPool } from './util.js';
 
@@ -52,7 +58,8 @@ export async function deriveJSON(
     if (isJsonNodeSlot(value)) return { $node: visitNode(value.$node) };
     if (value && typeof value === 'object') {
       const out: Record<string, unknown> = {};
-      for (const [k, v] of Object.entries(value as Record<string, unknown>)) out[k] = visitValue(v);
+      for (const [k, v] of Object.entries(value as Record<string, unknown>))
+        out[k] = visitValue(v);
       return out;
     }
     return value;
@@ -79,7 +86,11 @@ export async function deriveJSON(
   };
 
   const root = visitNode(json.root);
-  const ctx: DeriveContext = { context: options.context, signal: options.signal, resolve: options.resolve };
+  const ctx: DeriveContext = {
+    context: options.context,
+    signal: options.signal,
+    resolve: options.resolve,
+  };
   await runPool(
     [...tasks],
     options.concurrency,
@@ -96,5 +107,9 @@ export async function deriveJSON(
     },
     options.signal,
   );
-  return { ...json, root, derived: Object.keys(derived).length ? derived : undefined };
+  return {
+    ...json,
+    root,
+    derived: Object.keys(derived).length ? derived : undefined,
+  };
 }

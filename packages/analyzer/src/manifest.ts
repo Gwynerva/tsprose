@@ -1,9 +1,22 @@
-import { loadTsproseConfig, type LoadedConfig } from '@tsprose/transform/tooling';
-import { collectTags, isTagsDescription, s, type AnyTag, type BaseDef, type TagsDescription } from 'tsprose';
+import {
+  loadTsproseConfig,
+  type LoadedConfig,
+} from '@tsprose/transform/tooling';
+import {
+  collectTags,
+  isTagsDescription,
+  s,
+  type AnyTag,
+  type BaseDef,
+  type TagsDescription,
+} from 'tsprose';
 import type { Manifest } from './types.js';
 
 /** Build a manifest from a module namespace or plain object: every exported tag under its export name. */
-export function manifestFromExports(exportsObject: Record<string, unknown>, extra: Omit<Manifest, 'tags'> = {}): Manifest {
+export function manifestFromExports(
+  exportsObject: Record<string, unknown>,
+  extra: Omit<Manifest, 'tags'> = {},
+): Manifest {
   // Tags, member tags (`List.Item`), templates and components carrying a definition.
   const tags = collectTags(exportsObject) as Record<string, AnyTag>;
   return { tags, ...extra };
@@ -14,7 +27,10 @@ export function manifestFromExports(exportsObject: Record<string, unknown>, extr
  * no TypeScript import needed. Synthetic tags carry exactly what the rules use (definition, kit common props,
  * autowrap, presets).
  */
-export function manifestFromDescription(description: TagsDescription, extra: Omit<Manifest, 'tags'> = {}): Manifest {
+export function manifestFromDescription(
+  description: TagsDescription,
+  extra: Omit<Manifest, 'tags'> = {},
+): Manifest {
   const byType = new Map<string, AnyTag>();
   const tags: Record<string, AnyTag> = {};
   for (const [name, d] of Object.entries(description.tags)) {
@@ -25,10 +41,24 @@ export function manifestFromDescription(description: TagsDescription, extra: Omi
         min: c.min,
         max: c.max ?? Number.POSITIVE_INFINITY,
         ...(c.pattern ? { pattern: c.pattern } : {}),
-        ...(c.counts ? { counts: Object.fromEntries(Object.entries(c.counts).map(([k, [min, max]]) => [k, [min, max ?? Number.POSITIVE_INFINITY] as const])) } : {}),
+        ...(c.counts
+          ? {
+              counts: Object.fromEntries(
+                Object.entries(c.counts).map(([k, [min, max]]) => [
+                  k,
+                  [min, max ?? Number.POSITIVE_INFINITY] as const,
+                ]),
+              ),
+            }
+          : {}),
       };
       if (c.mode === 'kind') return { of: c.kind!, ...base };
-      if (c.mode === 'tags') return { of: () => (c.types ?? []).map((type) => byType.get(type) ?? stubFor(type)), ...base };
+      if (c.mode === 'tags')
+        return {
+          of: () =>
+            (c.types ?? []).map((type) => byType.get(type) ?? stubFor(type)),
+          ...base,
+        };
       return { of: 'any' as const, ...base };
     })();
     const def = {
@@ -43,8 +73,13 @@ export function manifestFromDescription(description: TagsDescription, extra: Omi
     const common = Object.fromEntries(d.common.map((p) => [p, s.unknown()]));
     const tag = Object.assign(() => undefined, {
       def,
-      kit: { commonSpecFor: () => common, wrapLooseInline: d.wrapsLooseInline ? (() => undefined) : undefined },
-      preset: d.preset.length ? Object.fromEntries(d.preset.map((p) => [p, true])) : undefined,
+      kit: {
+        commonSpecFor: () => common,
+        wrapLooseInline: d.wrapsLooseInline ? () => undefined : undefined,
+      },
+      preset: d.preset.length
+        ? Object.fromEntries(d.preset.map((p) => [p, true]))
+        : undefined,
     }) as unknown as AnyTag;
     tags[name] = tag;
     if (!byType.has(d.type)) byType.set(d.type, tag);
@@ -53,12 +88,19 @@ export function manifestFromDescription(description: TagsDescription, extra: Omi
 }
 
 function stubFor(type: string): AnyTag {
-  return Object.assign(() => undefined, { def: { name: type, kind: 'block', props: {}, children: 'any', ref: 'none' } }) as unknown as AnyTag;
+  return Object.assign(() => undefined, {
+    def: { name: type, kind: 'block', props: {}, children: 'any', ref: 'none' },
+  }) as unknown as AnyTag;
 }
 
 /** Accept a Manifest, or a JSON tags description (converted with {@link manifestFromDescription}). */
-export function toManifest(value: Manifest | TagsDescription, extra: Omit<Manifest, 'tags'> = {}): Manifest {
-  return isTagsDescription(value) ? manifestFromDescription(value, extra) : value;
+export function toManifest(
+  value: Manifest | TagsDescription,
+  extra: Omit<Manifest, 'tags'> = {},
+): Manifest {
+  return isTagsDescription(value)
+    ? manifestFromDescription(value, extra)
+    : value;
 }
 
 export function defineManifest(manifest: Manifest): Manifest {
@@ -79,14 +121,21 @@ export function manifestFromConfig(loaded: LoadedConfig): Manifest {
     mathTags: config.mathTags,
   };
   if (config.manifest && typeof config.manifest === 'object') {
-    return manifestFromDescription(config.manifest as unknown as TagsDescription, {
-      ...extra,
-      wrapsLooseInline: config.wrapsLooseInline ?? true,
-      transform: config.transform ?? true,
-    });
+    return manifestFromDescription(
+      config.manifest as unknown as TagsDescription,
+      {
+        ...extra,
+        wrapsLooseInline: config.wrapsLooseInline ?? true,
+        transform: config.transform ?? true,
+      },
+    );
   }
   if (config.tags) {
-    const flags = { ...extra, wrapsLooseInline: config.wrapsLooseInline, transform: config.transform };
+    const flags = {
+      ...extra,
+      wrapsLooseInline: config.wrapsLooseInline,
+      transform: config.transform,
+    };
     return isTagsDescription(config.tags)
       ? manifestFromDescription(config.tags, flags)
       : { tags: config.tags as Record<string, AnyTag>, ...flags };

@@ -12,14 +12,22 @@ const DEFAULT_FILES = '**/content/**/*.tsx';
  */
 export function activate(context: vscode.ExtensionContext): void {
   const output = vscode.window.createOutputChannel('TSProse');
-  output.appendLine(`TSProse formatter active (${context.extension.packageJSON.version as string}).`);
-  const log = (message: string) => output.appendLine(`[${new Date().toLocaleTimeString()}] ${message}`);
+  output.appendLine(
+    `TSProse formatter active (${context.extension.packageJSON.version as string}).`,
+  );
+  const log = (message: string) =>
+    output.appendLine(`[${new Date().toLocaleTimeString()}] ${message}`);
   const provider: vscode.DocumentFormattingEditProvider = {
     async provideDocumentFormattingEdits(document, _options, token) {
-      const config = vscode.workspace.getConfiguration('tsprose.fmt', document.uri);
+      const config = vscode.workspace.getConfiguration(
+        'tsprose.fmt',
+        document.uri,
+      );
       const glob = config.get<string>('files', DEFAULT_FILES);
       const folder = vscode.workspace.getWorkspaceFolder(document.uri);
-      const relative = folder ? vscode.workspace.asRelativePath(document.uri, false) : document.uri.fsPath;
+      const relative = folder
+        ? vscode.workspace.asRelativePath(document.uri, false)
+        : document.uri.fsPath;
       // VS Code's own glob engine: relative to the workspace folder, or against the whole path outside one.
       const pattern = folder ? new vscode.RelativePattern(folder, glob) : glob;
       if (vscode.languages.match({ pattern }, document) === 0) {
@@ -28,25 +36,42 @@ export function activate(context: vscode.ExtensionContext): void {
       }
 
       const command = config.get<string>('command', 'bunx tsprose-fmt');
-      const configPath = resolveConfigPath(config.get<string>('config', ''), folder?.uri.fsPath, document.uri.fsPath);
+      const configPath = resolveConfigPath(
+        config.get<string>('config', ''),
+        folder?.uri.fsPath,
+        document.uri.fsPath,
+      );
       const args = ['--stdin', '--stdin-filepath', document.uri.fsPath];
       if (configPath) args.push('--config', configPath);
 
       const started = Date.now();
       const text = document.getText();
-      const formatted = await run(command, args, text, folder?.uri.fsPath, token, output);
+      const formatted = await run(
+        command,
+        args,
+        text,
+        folder?.uri.fsPath,
+        token,
+        output,
+      );
       if (formatted === undefined || token.isCancellationRequested) return [];
       if (formatted === text) {
         log(`${relative}: already formatted (${Date.now() - started} ms)`);
         return [];
       }
       log(`${relative}: formatted (${Date.now() - started} ms)`);
-      const full = new vscode.Range(document.positionAt(0), document.positionAt(text.length));
+      const full = new vscode.Range(
+        document.positionAt(0),
+        document.positionAt(text.length),
+      );
       return [vscode.TextEdit.replace(full, formatted)];
     },
   };
   context.subscriptions.push(
-    vscode.languages.registerDocumentFormattingEditProvider([{ language: 'typescriptreact' }, { language: 'javascriptreact' }], provider),
+    vscode.languages.registerDocumentFormattingEditProvider(
+      [{ language: 'typescriptreact' }, { language: 'javascriptreact' }],
+      provider,
+    ),
     output,
   );
 }
@@ -70,7 +95,11 @@ function run(
       resolve(undefined);
       return;
     }
-    const child = spawn(spec.file, spec.args, { cwd, shell: spec.shell, windowsHide: true });
+    const child = spawn(spec.file, spec.args, {
+      cwd,
+      shell: spec.shell,
+      windowsHide: true,
+    });
     const out: Buffer[] = [];
     const err: Buffer[] = [];
     const cancellation = token.onCancellationRequested(() => child.kill());
@@ -86,7 +115,9 @@ function run(
     });
     child.on('close', (code) => {
       if (code !== 0) {
-        output.appendLine(`tsprose-fmt exited with ${code}: ${Buffer.concat(err).toString('utf8')}`);
+        output.appendLine(
+          `tsprose-fmt exited with ${code}: ${Buffer.concat(err).toString('utf8')}`,
+        );
         finish(undefined);
         return;
       }

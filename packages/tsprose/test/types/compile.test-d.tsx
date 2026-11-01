@@ -43,7 +43,9 @@ describe('documents and refs', () => {
     // @ts-expect-error Include has no children
     <Include of={refs.thm}>x</Include>;
     <Include of={ref('other', 'thm')} />;
-    expectTypeOf<NodeOf<typeof Include>['props']['of']>().toEqualTypeOf<Ref | RefTarget | Addressable>();
+    expectTypeOf<NodeOf<typeof Include>['props']['of']>().toEqualTypeOf<
+      Ref | RefTarget | Addressable
+    >();
   });
 });
 
@@ -55,20 +57,30 @@ describe('compile result', () => {
     expectTypeOf(result.diagnostics).toEqualTypeOf<Diagnostic[]>();
     expectTypeOf(result.refs.get('x')).toEqualTypeOf<BaseNode | undefined>();
     expectTypeOf(result.derived.get('k')).toEqualTypeOf<unknown>();
-    expectTypeOf(select(result.root, Theorem)[0]!.data.slug).toEqualTypeOf<string>();
+    expectTypeOf(
+      select(result.root, Theorem)[0]!.data.slug,
+    ).toEqualTypeOf<string>();
   });
 
   it('hooks are typed by their result', async () => {
     const hook = defineHook({ name: 'count', finish: () => 42 });
-    expectTypeOf(hook.finish!).returns.toEqualTypeOf<number | Promise<number>>();
+    expectTypeOf(hook.finish!).returns.toEqualTypeOf<
+      number | Promise<number>
+    >();
     const corpus = new Corpus();
     const out = await compileCorpus(corpus, { hooks: [hook] });
-    expectTypeOf(out.results.get('a')).toEqualTypeOf<CompileResult | undefined>();
+    expectTypeOf(out.results.get('a')).toEqualTypeOf<
+      CompileResult | undefined
+    >();
   });
 
   it('json round trip types', async () => {
     const result = await compile(defineDocument(() => <Qed />));
-    const json = toJSON({ root: result.root, refs: result.refs, derived: result.derived });
+    const json = toJSON({
+      root: result.root,
+      refs: result.refs,
+      derived: result.derived,
+    });
     expectTypeOf(json).toEqualTypeOf<ProseJSON>();
     expectTypeOf(fromJSON(json).root).toEqualTypeOf<BaseNode>();
   });
@@ -76,7 +88,11 @@ describe('compile result', () => {
 
 describe('defineRefs accepts def carriers', () => {
   it('a component wrapping a referable tag works as a refs template entry', () => {
-    const Wrapped = Object.assign((props: { title: string; children?: unknown }) => Theorem({ ...props, $: 'x' } as never), { def: Theorem.def });
+    const Wrapped = Object.assign(
+      (props: { title: string; children?: unknown }) =>
+        Theorem({ ...props, $: 'x' } as never),
+      { def: Theorem.def },
+    );
     const refs = defineRefs({ th: Wrapped });
     expectTypeOf(refs.th).toEqualTypeOf<Ref<typeof Theorem.def>>();
     // @ts-expect-error a component wrapping a non-referable tag is rejected

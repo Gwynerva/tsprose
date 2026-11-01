@@ -26,7 +26,14 @@ are never fixed. The config is the shared `tsprose.config.ts` (see `@tsprose/tra
 // eslint.config.js
 import tsprose from '@tsprose/analyzer/eslint';
 import { manifest } from './tsprose.config.ts';
-export default [{ files: ['content/**/*.tsx'], plugins: { tsprose }, settings: { tsprose: manifest }, rules: tsprose.configs.recommended.rules }];
+export default [
+  {
+    files: ['content/**/*.tsx'],
+    plugins: { tsprose },
+    settings: { tsprose: manifest },
+    rules: tsprose.configs.recommended.rules,
+  },
+];
 ```
 
 The manifest is `{ tags: { JSXName: Tag }, wrapsLooseInline?, transform?, inlineComponents? }`; `manifestFromExports(await import('./tags'))`

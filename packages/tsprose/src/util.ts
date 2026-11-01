@@ -6,8 +6,11 @@ export function errorMessage(error: unknown): string {
 }
 
 /** A plain object (`{}` literal or `Object.create(null)`), not a class instance, array, proxy-of-class, … */
-export function isPlainObject(value: unknown): value is Record<string, unknown> {
-  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
+export function isPlainObject(
+  value: unknown,
+): value is Record<string, unknown> {
+  if (value === null || typeof value !== 'object' || Array.isArray(value))
+    return false;
   const proto = Object.getPrototypeOf(value);
   return proto === Object.prototype || proto === null;
 }

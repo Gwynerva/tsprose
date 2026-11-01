@@ -3,7 +3,10 @@ import { describe, expectTypeOf, it } from 'vitest';
 import { defineInline, ref, refSchema, type RefTarget } from 'tsprose';
 import { Theorem } from '../fixtures/tags.js';
 
-const Uses = defineInline({ name: 'uses', props: { theorem: refSchema(Theorem) } });
+const Uses = defineInline({
+  name: 'uses',
+  props: { theorem: refSchema(Theorem) },
+});
 const Link = defineInline({ name: 'link', props: { to: refSchema() } });
 
 describe('CorpusRegistry-driven ref()', () => {
@@ -20,7 +23,9 @@ describe('CorpusRegistry-driven ref()', () => {
   });
 
   it('knows the target tag', () => {
-    expectTypeOf(ref('ref/lagrange', 'lagrange')).toEqualTypeOf<RefTarget<'theorem'>>();
+    expectTypeOf(ref('ref/lagrange', 'lagrange')).toEqualTypeOf<
+      RefTarget<'theorem'>
+    >();
     <Uses theorem={ref('ref/lagrange', 'lagrange')} />;
     // @ts-expect-error a paragraph is not a theorem
     <Uses theorem={ref('ref/lagrange', 'note')} />;

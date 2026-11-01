@@ -37,27 +37,34 @@ type RegisteredChildren<C extends ChildrenSpec, Tags> = C extends 'none'
               : (RegisteredNodes<Tags> | TextNode)[];
 
 /** A node whose kind-based children (`'block'`/`'inline'`) are resolved against the tag union `Tags`. */
-export type RegisteredIn<N, Tags> = N extends Node<infer D, infer M>
-  ? Omit<Node<D, M>, 'children'> & { children: RegisteredChildren<D['children'], Tags> }
-  : never;
+export type RegisteredIn<N, Tags> =
+  N extends Node<infer D, infer M>
+    ? Omit<Node<D, M>, 'children'> & {
+        children: RegisteredChildren<D['children'], Tags>;
+      }
+    : never;
 
 /** Union of all registered element nodes (without text). */
 export type RegisteredNodes<Tags> = RegisteredIn<NodeOf<Tags>, Tags>;
 
 /** Element union for an explicit tag list. */
-export type ProseNodeOf<Tags extends readonly AnyTag[]> = RegisteredNodes<Tags[number]> | TextNode;
+export type ProseNodeOf<Tags extends readonly AnyTag[]> =
+  RegisteredNodes<Tags[number]> | TextNode;
 
 /** Element union for the global {@link Registry}; falls back to `BaseNode | TextNode` when nothing is registered. */
-export type ProseNode = HasRegistry extends true ? RegisteredNodes<RegistryTags> | TextNode : BaseNode | TextNode;
+export type ProseNode = HasRegistry extends true
+  ? RegisteredNodes<RegistryTags> | TextNode
+  : BaseNode | TextNode;
 
 /** Registered node for one tag (children resolved through the global registry). */
-export type Registered<T extends AnyTag> = HasRegistry extends true ? RegisteredIn<NodeOf<T>, RegistryTags> : NodeOf<T>;
+export type Registered<T extends AnyTag> = HasRegistry extends true
+  ? RegisteredIn<NodeOf<T>, RegistryTags>
+  : NodeOf<T>;
 
 /** Map a tag list to a registry-shaped interface: `interface Registry extends TagsToRegistry<typeof tags> {}`. */
 export type TagsToRegistry<Tags extends readonly AnyTag[]> = {
   [T in Tags[number] as T['def']['name']]: T;
 };
-
 
 /** Explicit, registry-free prose instance. */
 export interface Prose<Tags extends readonly AnyTag[]> {
@@ -69,12 +76,16 @@ export interface Prose<Tags extends readonly AnyTag[]> {
 }
 
 /** A registry-free prose instance over an explicit tag list (typed node union, lookup by name for `fromJSON`). */
-export function createProse<const Tags extends readonly AnyTag[]>(options: { readonly tags: Tags }): Prose<Tags> {
+export function createProse<const Tags extends readonly AnyTag[]>(options: {
+  readonly tags: Tags;
+}): Prose<Tags> {
   const byName = new Map<string, Tags[number]>();
   for (const tag of options.tags) {
     const existing = byName.get(tag.def.name);
     if (existing && existing.def !== tag.def) {
-      throw new TypeError(`createProse: two different tags share the name "${tag.def.name}"`);
+      throw new TypeError(
+        `createProse: two different tags share the name "${tag.def.name}"`,
+      );
     }
     byName.set(tag.def.name, tag);
   }

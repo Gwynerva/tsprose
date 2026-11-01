@@ -17,12 +17,12 @@ loose inline content into its own paragraph — so the body of an article needs 
 in a container that does not autowrap, the separator is plain whitespace.
 
 ```ts
-import tsprose from '@tsprose/transform/vite';            // also /rollup, /esbuild, /webpack
+import tsprose from '@tsprose/transform/vite'; // also /rollup, /esbuild, /webpack
 export default { plugins: [tsprose({ isBlock: (name) => blocks.has(name) })] };
 
-import { tsproseBun } from '@tsprose/transform/bun';      // Bun.plugin / bunfig preload
-import { withTSProse } from '@tsprose/transform/jiti';    // createJiti(root, { transform: withTSProse(next) })
-import { transform } from '@tsprose/transform';            // transform(source, fileName, options) → { code, map, insertions }
+import { tsproseBun } from '@tsprose/transform/bun'; // Bun.plugin / bunfig preload
+import { withTSProse } from '@tsprose/transform/jiti'; // createJiti(root, { transform: withTSProse(next) })
+import { transform } from '@tsprose/transform'; // transform(source, fileName, options) → { code, map, insertions }
 ```
 
 Files with syntax errors are returned unchanged by every plugin (the compiler reports the error itself).
@@ -41,7 +41,7 @@ the one `tsprose.config.ts` schema all tools read:
 // tsprose.config.ts
 export default {
   manifest: './tsprose.manifest.json', // describeTags() output (or `tags: { JSXName: Tag }` + `inlineComponents`)
-  printWidth: 120,                      // formatter options: indent, preFormat, separateBlocks, compactContainers, blockCalls…
-  mathTags: ['M', 'BlockMath'],         // analyzer: tags whose text is LaTeX
+  printWidth: 120, // formatter options: indent, preFormat, separateBlocks, compactContainers, blockCalls…
+  mathTags: ['M', 'BlockMath'], // analyzer: tags whose text is LaTeX
 };
 ```

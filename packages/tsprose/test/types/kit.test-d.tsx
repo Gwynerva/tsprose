@@ -11,7 +11,9 @@ describe('kit common props', () => {
     expectTypeOf<CalloutProps>().toHaveProperty('toc');
     expectTypeOf<CalloutProps>().toHaveProperty('snippet');
     expectTypeOf<CalloutProps>().toHaveProperty('debugLabel');
-    expectTypeOf<CalloutProps['toc']>().toEqualTypeOf<string | boolean | undefined>();
+    expectTypeOf<CalloutProps['toc']>().toEqualTypeOf<
+      string | boolean | undefined
+    >();
 
     type HrProps = Parameters<typeof KHr>[0];
     expectTypeOf<Has<HrProps, 'debugLabel'>>().toEqualTypeOf<true>();
@@ -39,7 +41,9 @@ describe('kit common props', () => {
     // @ts-expect-error toc is not available on non-referable tags
     <KHr toc />;
     // @ts-expect-error snippet opted out
-    <KDetails $="d" title="T" snippet={{}}><Qed /></KDetails>;
+    <KDetails $="d" title="T" snippet={{}}>
+      <Qed />
+    </KDetails>;
   });
 
   it('adopted tags keep their definition and gain common props', () => {

@@ -1,4 +1,20 @@
-import type { B, Heading, I, Image, Item, P, Proof, Qed, Sec, Theorem, Em, M, Table, Tr, Td } from '../fixtures/tags.js';
+import type {
+  B,
+  Heading,
+  I,
+  Image,
+  Item,
+  P,
+  Proof,
+  Qed,
+  Sec,
+  Theorem,
+  Em,
+  M,
+  Table,
+  Tr,
+  Td,
+} from '../fixtures/tags.js';
 
 declare module 'tsprose' {
   interface Registry {

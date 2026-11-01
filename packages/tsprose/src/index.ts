@@ -1,40 +1,219 @@
 // Public API of tsprose. Low-level building blocks live in `tsprose/internal`.
 export { isObjectSchema, propKeys, s } from './standard.js';
-export type { DistributiveOmit, ExclusiveOf, InferOutput, InferProps, Primitive, PropsInput, PropsOf, PropsSpec, RefMeta, Schema, StandardSchemaV1 } from './standard.js';
-export { DiagnosticBag, TSProseError, formatDiagnostic, formatDiagnostics, formatPos, hasErrors } from './diagnostics.js';
+export type {
+  DistributiveOmit,
+  ExclusiveOf,
+  InferOutput,
+  InferProps,
+  Primitive,
+  PropsInput,
+  PropsOf,
+  PropsSpec,
+  RefMeta,
+  Schema,
+  StandardSchemaV1,
+} from './standard.js';
+export {
+  DiagnosticBag,
+  TSProseError,
+  formatDiagnostic,
+  formatDiagnostics,
+  formatPos,
+  hasErrors,
+} from './diagnostics.js';
 export type { Diagnostic, Severity, SourcePos } from './diagnostics.js';
 export { canonicalJson, hashText } from './hash.js';
 export { isChildrenRule, resolveChildrenRule } from './def.js';
-export type { BaseDef, BlockDef, ChildrenContext, ChildrenOf, ChildrenRule, ChildrenSpec, DataContext, Def, DeriveContext, InlineDef, Kind, LazyTagList, NormalizeContext, NormalizeFn, OptOut, RefMode, ReportFn, ResolvedChildrenRule, TagList } from './def.js';
+export type {
+  BaseDef,
+  BlockDef,
+  ChildrenContext,
+  ChildrenOf,
+  ChildrenRule,
+  ChildrenSpec,
+  DataContext,
+  Def,
+  DeriveContext,
+  InlineDef,
+  Kind,
+  LazyTagList,
+  NormalizeContext,
+  NormalizeFn,
+  OptOut,
+  RefMode,
+  ReportFn,
+  ResolvedChildrenRule,
+  TagList,
+} from './def.js';
 export { isAnyNode, isBaseNode, isFragmentNode, isTextNode } from './node.js';
-export type { AnyNode, BaseNode, BlockNode, ChildNodes, DataOf, DefOf, InlineNode, MetaOf, Node, NodeOf, RefOf, TextNode } from './node.js';
-export { ADDRESS, REFS, addressKey, addressOf, defineRefs, isAddressable, isRef, isRefTarget, isReferenceValue, listRefs, parseAddress, ref, refSchema, referenceLabel, toRefTarget } from './ref.js';
-export type { Address, Addressable, CorpusRegistry, DefCarrier, Ref, RefSchemaOptions, RefScope, RefTarget, ReferenceValue, Refs, RefsTemplate } from './ref.js';
+export type {
+  AnyNode,
+  BaseNode,
+  BlockNode,
+  ChildNodes,
+  DataOf,
+  DefOf,
+  InlineNode,
+  MetaOf,
+  Node,
+  NodeOf,
+  RefOf,
+  TextNode,
+} from './node.js';
+export {
+  ADDRESS,
+  REFS,
+  addressKey,
+  addressOf,
+  defineRefs,
+  isAddressable,
+  isRef,
+  isRefTarget,
+  isReferenceValue,
+  listRefs,
+  parseAddress,
+  ref,
+  refSchema,
+  referenceLabel,
+  toRefTarget,
+} from './ref.js';
+export type {
+  Address,
+  Addressable,
+  CorpusRegistry,
+  DefCarrier,
+  Ref,
+  RefSchemaOptions,
+  RefScope,
+  RefTarget,
+  ReferenceValue,
+  Refs,
+  RefsTemplate,
+} from './ref.js';
 export { PARAGRAPH_SEPARATOR, flattenChildren } from './children.js';
 export { makeFragment } from './element.js';
 export type { ComponentResult, TagCallContext } from './element.js';
-export { createTag, defineBlock, defineInline, isTag, isTextTemplate } from './tag.js';
-export type { AnyTag, BlockDefiner, CommonProps, DefInput, DefInputFor, InlineChildrenSpec, InlineDefiner, InlineTag, KitMeta, Tag, TagProps, TextTemplate, WithDerive } from './tag.js';
+export {
+  createTag,
+  defineBlock,
+  defineInline,
+  isTag,
+  isTextTemplate,
+} from './tag.js';
+export type {
+  AnyTag,
+  BlockDefiner,
+  CommonProps,
+  DefInput,
+  DefInputFor,
+  InlineChildrenSpec,
+  InlineDefiner,
+  InlineTag,
+  KitMeta,
+  Tag,
+  TagProps,
+  TextTemplate,
+  WithDerive,
+} from './tag.js';
 export { createTagKit } from './kit.js';
-export type { ElementHookContext, KitOptions, KitRuntime, TagKit } from './kit.js';
+export type {
+  ElementHookContext,
+  KitOptions,
+  KitRuntime,
+  TagKit,
+} from './kit.js';
 export { createProse } from './registry.js';
-export type { HasRegistry, Prose, ProseNode, ProseNodeOf, Registered, RegisteredIn, RegisteredNodes, Registry, RegistryTags, TagsToRegistry } from './registry.js';
+export type {
+  HasRegistry,
+  Prose,
+  ProseNode,
+  ProseNodeOf,
+  Registered,
+  RegisteredIn,
+  RegisteredNodes,
+  Registry,
+  RegistryTags,
+  TagsToRegistry,
+} from './registry.js';
 export { defineDocument, isDocument } from './document.js';
 export type { Document, DocumentOptions } from './document.js';
 export { Corpus } from './corpus.js';
 export { CorpusIndex } from './corpus-index.js';
-export type { AffectedAction, CorpusIndexJSON, CorpusIndexOptions, DanglingSeverity, IndexEntryInput, IndexedDocument, IndexedEdge, IndexedTarget, InvalidationPolicy, RegistryEntry, ResolveFn, ResolvedAddress } from './corpus-index.js';
-export { generateRegistryTypes, registryEntriesFromCorpus } from './registry-types.js';
+export type {
+  AffectedAction,
+  CorpusIndexJSON,
+  CorpusIndexOptions,
+  DanglingSeverity,
+  IndexEntryInput,
+  IndexedDocument,
+  IndexedEdge,
+  IndexedTarget,
+  InvalidationPolicy,
+  RegistryEntry,
+  ResolveFn,
+  ResolvedAddress,
+} from './corpus-index.js';
+export {
+  generateRegistryTypes,
+  registryEntriesFromCorpus,
+} from './registry-types.js';
 export type { RegistryTypesOptions } from './registry-types.js';
-export { cloneNode, find, findAll, indexTree, nodesInData, select, walk, walkAsync } from './walk.js';
-export type { AsyncVisitor, TreeIndex, Visitor, WalkContext, WalkSignal } from './walk.js';
+export {
+  cloneNode,
+  find,
+  findAll,
+  indexTree,
+  nodesInData,
+  select,
+  walk,
+  walkAsync,
+} from './walk.js';
+export type {
+  AsyncVisitor,
+  TreeIndex,
+  Visitor,
+  WalkContext,
+  WalkSignal,
+} from './walk.js';
 export { slugify } from './slugify.js';
-export { deriveKey, fromJSON, nodeFromJSON, nodeToJSON, toJSON } from './json.js';
-export type { FromJSONOptions, FromJSONResult, JsonNode, JsonNodeSlot, ProseJSON, ToJSONInput } from './json.js';
-export { Include, compile, compileCorpus, createCompileSession, defineHook } from './compile.js';
-export type { CompileInput, CompileOptions, CompileResult, CompileSession, DeriveFn, Hook, HookContext, OutgoingRef } from './compile.js';
+export {
+  deriveKey,
+  fromJSON,
+  nodeFromJSON,
+  nodeToJSON,
+  toJSON,
+} from './json.js';
+export type {
+  FromJSONOptions,
+  FromJSONResult,
+  JsonNode,
+  JsonNodeSlot,
+  ProseJSON,
+  ToJSONInput,
+} from './json.js';
+export {
+  Include,
+  compile,
+  compileCorpus,
+  createCompileSession,
+  defineHook,
+} from './compile.js';
+export type {
+  CompileInput,
+  CompileOptions,
+  CompileResult,
+  CompileSession,
+  DeriveFn,
+  Hook,
+  HookContext,
+  OutgoingRef,
+} from './compile.js';
 export { collectTags, describeTags, isTagsDescription } from './manifest.js';
-export type { ChildrenDescription, TagDescription, TagsDescription } from './manifest.js';
+export type {
+  ChildrenDescription,
+  TagDescription,
+  TagsDescription,
+} from './manifest.js';
 export { deriveJSON } from './derive-json.js';
 export type { DeriveJSONOptions, JsonDeriveFn } from './derive-json.js';
 export { Fragment } from './jsx-runtime.js';

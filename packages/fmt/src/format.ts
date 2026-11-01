@@ -54,7 +54,8 @@ export interface FormatOptions {
    * predicate on the container tag name (fragments pass `undefined`) to keep some compact (`<Table>`, `<List>`).
    * Default: off — existing blank lines are preserved (max one) and none are added.
    */
-  readonly separateBlocks?: boolean | ((containerName: string | undefined) => boolean) | undefined;
+  readonly separateBlocks?:
+    boolean | ((containerName: string | undefined) => boolean) | undefined;
   /** Print the `$` (ref) attribute first (elements with spread attributes keep their order). */
   readonly refFirst?: boolean | undefined;
   /**
@@ -101,7 +102,11 @@ interface Ctx {
 // JSX whitespace plus a literal paragraph separator: nothing to print as a word.
 const WS_ONLY = /^[ \t\r\n\f\u2029]*$/;
 
-export function format(source: string, fileName: string, options: FormatOptions = {}): FormatResult {
+export function format(
+  source: string,
+  fileName: string,
+  options: FormatOptions = {},
+): FormatResult {
   const parsed = parseProse(source, fileName);
   const errors = parsed.errors.map((e) => e.message);
   if (errors.length) return { code: source, changed: false, errors };
@@ -112,10 +117,14 @@ export function format(source: string, fileName: string, options: FormatOptions 
     unit: options.indent === 'tab' ? '\t' : ' '.repeat(options.indent ?? 2),
     transform: options.transform ?? true,
     kindOf: options.kindOf ?? (() => 'unknown'),
-    isInlineContainer: options.isInlineContainer ?? ((name) => (options.kindOf ?? (() => 'unknown'))(name) === 'inline'),
+    isInlineContainer:
+      options.isInlineContainer ??
+      ((name) => (options.kindOf ?? (() => 'unknown'))(name) === 'inline'),
     blockCalls: new Set(options.blockCalls ?? []),
     separateBlocks:
-      typeof options.separateBlocks === 'function' ? options.separateBlocks : () => options.separateBlocks === true,
+      typeof options.separateBlocks === 'function'
+        ? options.separateBlocks
+        : () => options.separateBlocks === true,
     refFirst: options.refFirst === true,
     jsxInput: options.input === 'jsx',
     closing: options.closing ?? DEFAULT_CLOSING,
@@ -132,7 +141,10 @@ export function format(source: string, fileName: string, options: FormatOptions 
   let cursor = 0;
   for (const region of regions.sort((a, b) => a.start - b.start)) {
     out += source.slice(cursor, region.start);
-    out += restoreEol(toLf(printBlockLike(region, lineIndent(source, region.start), ctx)), eol);
+    out += restoreEol(
+      toLf(printBlockLike(region, lineIndent(source, region.start), ctx)),
+      eol,
+    );
     cursor = region.end;
   }
   out += source.slice(cursor);
@@ -142,7 +154,8 @@ export function format(source: string, fileName: string, options: FormatOptions 
 /** Outermost JSX elements and fragments under `root` (`root` itself excluded): the regions to print. */
 function collectRegions(root: AstNode, out: AstNode[]): void {
   walkAst<AstNode>(root, (n) => {
-    if (n === root || (n.type !== 'JSXElement' && n.type !== 'JSXFragment')) return;
+    if (n === root || (n.type !== 'JSXElement' && n.type !== 'JSXFragment'))
+      return;
     out.push(n);
     return false; // nested JSX inside expressions is printed as part of the region
   });
@@ -201,7 +214,13 @@ type Child =
   | { kind: 'text'; raw: string; node: AstNode }
   | { kind: 'blank' }
   | { kind: 'element'; node: AstNode; inline: boolean }
-  | { kind: 'expression'; node: AstNode; space: boolean; glue: boolean; block?: boolean }
+  | {
+      kind: 'expression';
+      node: AstNode;
+      space: boolean;
+      glue: boolean;
+      block?: boolean;
+    }
   | { kind: 'comment'; node: AstNode };
 
 function childrenOf(node: AstNode, ctx: Ctx): Child[] {
@@ -224,7 +243,8 @@ function childrenOf(node: AstNode, ctx: Ctx): Child[] {
           const parts = raw.split(BLANK_RUN);
           for (let i = 0; i < parts.length; i++) {
             if (i % 2 === 1) out.push({ kind: 'blank' });
-            else if (parts[i]!.length) out.push({ kind: 'text', raw: parts[i]!, node: child });
+            else if (parts[i]!.length)
+              out.push({ kind: 'text', raw: parts[i]!, node: child });
           }
         }
         break;
@@ -237,60 +257,101 @@ function childrenOf(node: AstNode, ctx: Ctx): Child[] {
         break;
       case 'space':
       case 'glue':
-        out.push({ kind: 'expression', node: child, space: c.kind === 'space', glue: c.kind === 'glue' });
+        out.push({
+          kind: 'expression',
+          node: child,
+          space: c.kind === 'space',
+          glue: c.kind === 'glue',
+        });
         break;
       case 'element':
-        out.push({ kind: 'element', node: child, inline: ctx.kindOf(c.name ?? '?') === 'inline' });
+        out.push({
+          kind: 'element',
+          node: child,
+          inline: ctx.kindOf(c.name ?? '?') === 'inline',
+        });
         break;
       case 'fragment':
         out.push({ kind: 'element', node: child, inline: false });
         break;
       case 'expression':
-        out.push({ kind: 'expression', node: child, space: false, glue: false, block: isBlockCall(c.expression, ctx) });
+        out.push({
+          kind: 'expression',
+          node: child,
+          space: false,
+          glue: false,
+          block: isBlockCall(c.expression, ctx),
+        });
         break;
       default:
         // Static strings, templates and other literals: printed verbatim, filled like words.
-        out.push({ kind: 'expression', node: child, space: false, glue: false });
+        out.push({
+          kind: 'expression',
+          node: child,
+          space: false,
+          glue: false,
+        });
     }
   }
   return out;
 }
 
 function hasBlockChildren(children: Child[]): boolean {
-  return children.some((c) => (c.kind === 'element' && !c.inline) || (c.kind === 'expression' && c.block));
+  return children.some(
+    (c) =>
+      (c.kind === 'element' && !c.inline) ||
+      (c.kind === 'expression' && c.block),
+  );
 }
 
 /** `f\`…\``, `f(opts)\`…\``, `f(…)` where `f` is listed in `blockCalls`. */
 function isBlockCall(expr: AstNode, ctx: Ctx): boolean {
   if (!ctx.blockCalls.size) return false;
   let callee: AstNode | undefined =
-    expr.type === 'TaggedTemplateExpression' ? (expr.tag as AstNode) : expr.type === 'CallExpression' ? (expr.callee as AstNode) : undefined;
+    expr.type === 'TaggedTemplateExpression'
+      ? (expr.tag as AstNode)
+      : expr.type === 'CallExpression'
+        ? (expr.callee as AstNode)
+        : undefined;
   if (callee?.type === 'CallExpression') callee = callee.callee as AstNode;
-  return callee?.type === 'Identifier' && ctx.blockCalls.has(callee.name as string);
+  return (
+    callee?.type === 'Identifier' && ctx.blockCalls.has(callee.name as string)
+  );
 }
 
 /** A blank line between two pieces of content (a paragraph break in a block container). */
 function hasParagraphBreak(children: Child[]): boolean {
-  const content = (c: Child) => c.kind !== 'blank' && !(c.kind === 'text' && WS_ONLY.test(c.raw));
+  const content = (c: Child) =>
+    c.kind !== 'blank' && !(c.kind === 'text' && WS_ONLY.test(c.raw));
   let seen = false;
   for (let i = 0; i < children.length; i++) {
     const c = children[i]!;
-    if (c.kind === 'blank' && seen && children.slice(i + 1).some(content)) return true;
+    if (c.kind === 'blank' && seen && children.slice(i + 1).some(content))
+      return true;
     if (content(c)) seen = true;
   }
   return false;
 }
 
 function hasContent(children: Child[]): boolean {
-  return children.some((c) => (c.kind === 'text' ? !WS_ONLY.test(c.raw) : c.kind !== 'blank'));
+  return children.some((c) =>
+    c.kind === 'text' ? !WS_ONLY.test(c.raw) : c.kind !== 'blank',
+  );
 }
 
 function attributeTexts(node: AstNode, indent: string, ctx: Ctx): string[] {
   const opening = node.openingElement as AstNode;
   let attributes = opening.attributes as AstNode[];
-  if (ctx.refFirst && !attributes.some((a) => a.type === 'JSXSpreadAttribute')) {
-    const isRef = (a: AstNode) => a.type === 'JSXAttribute' && (a.name as AstNode).name === '$';
-    attributes = [...attributes.filter(isRef), ...attributes.filter((a) => !isRef(a))];
+  if (
+    ctx.refFirst &&
+    !attributes.some((a) => a.type === 'JSXSpreadAttribute')
+  ) {
+    const isRef = (a: AstNode) =>
+      a.type === 'JSXAttribute' && (a.name as AstNode).name === '$';
+    attributes = [
+      ...attributes.filter(isRef),
+      ...attributes.filter((a) => !isRef(a)),
+    ];
   }
   return attributes.map((a) => {
     const text = verbatim(a, ctx).replace(/\s+$/, '');
@@ -299,7 +360,13 @@ function attributeTexts(node: AstNode, indent: string, ctx: Ctx): string[] {
 }
 
 /** Opening tag. Block tags break attributes one per line when they do not fit or span lines; inline tags never break. */
-function openTag(node: AstNode, indent: string, ctx: Ctx, selfClosing: boolean, inline: boolean): string {
+function openTag(
+  node: AstNode,
+  indent: string,
+  ctx: Ctx,
+  selfClosing: boolean,
+  inline: boolean,
+): string {
   if (isFragment(node)) return selfClosing ? '<></>' : '<>';
   const name = tagName(node);
   const inner = indent + ctx.unit;
@@ -325,27 +392,51 @@ function printBlockLike(node: AstNode, indent: string, ctx: Ctx): string {
 
   if (!hasContent(children)) return openTag(node, indent, ctx, true, false);
 
-  const inlineContainer = !isFragment(node) && ctx.isInlineContainer(tagName(node));
-  if (!hasBlockChildren(children) && (inlineContainer || !hasParagraphBreak(children))) {
+  const inlineContainer =
+    !isFragment(node) && ctx.isInlineContainer(tagName(node));
+  if (
+    !hasBlockChildren(children) &&
+    (inlineContainer || !hasParagraphBreak(children))
+  ) {
     const head = openTag(node, indent, ctx, false, false);
     const tail = closeTag(node);
     // A single verbatim expression hugs its tag: <Formula>{math`…`}</Formula>
-    const only = children.filter((c) => !(c.kind === 'text' && WS_ONLY.test(c.raw)) && c.kind !== 'blank');
-    if (only.length === 1 && only[0]!.kind === 'expression' && !only[0]!.space && !only[0]!.glue && !head.includes('\n')) {
+    const only = children.filter(
+      (c) => !(c.kind === 'text' && WS_ONLY.test(c.raw)) && c.kind !== 'blank',
+    );
+    if (
+      only.length === 1 &&
+      only[0]!.kind === 'expression' &&
+      !only[0]!.space &&
+      !only[0]!.glue &&
+      !head.includes('\n')
+    ) {
       const n = only[0]!.node;
-      const text = reindent(verbatim(n, ctx), lineIndent(ctx.source, n.start), indent);
+      const text = reindent(
+        verbatim(n, ctx),
+        lineIndent(ctx.source, n.start),
+        indent,
+      );
       return head + text + tail;
     }
     const tokens = inlineTokens(children, inner, ctx);
-    const single = tokens.map((t, i) => (i === 0 || t.glueBefore ? '' : ' ') + t.text).join('');
-    if (!head.includes('\n') && !single.includes('\n') && indent.length + head.length + single.length + tail.length <= ctx.width) {
+    const single = tokens
+      .map((t, i) => (i === 0 || t.glueBefore ? '' : ' ') + t.text)
+      .join('');
+    if (
+      !head.includes('\n') &&
+      !single.includes('\n') &&
+      indent.length + head.length + single.length + tail.length <= ctx.width
+    ) {
       return head + single + tail;
     }
     return `${head}\n${fill(tokens, inner, ctx)}\n${indent}${tail}`;
   }
 
   const lines: string[] = [openTag(node, indent, ctx, false, false)];
-  const separate = ctx.separateBlocks(isFragment(node) ? undefined : tagName(node));
+  const separate = ctx.separateBlocks(
+    isFragment(node) ? undefined : tagName(node),
+  );
   let run: Child[] = [];
   let runBlank = false;
   let pendingBlank = false;
@@ -383,7 +474,10 @@ function printBlockLike(node: AstNode, indent: string, ctx: Ctx): string {
       startItem(pendingBlank || separate);
       pendingBlank = false;
       const n = child.node;
-      lines.push(inner + reindent(verbatim(n, ctx), lineIndent(ctx.source, n.start), inner));
+      lines.push(
+        inner +
+          reindent(verbatim(n, ctx), lineIndent(ctx.source, n.start), inner),
+      );
       continue;
     }
     if (child.kind === 'text' && WS_ONLY.test(child.raw)) {
@@ -421,7 +515,8 @@ function maxSep(a: Sep, b: Sep): Sep {
 function inlineTokens(children: Child[], indent: string, ctx: Ctx): Token[] {
   const tokens: Token[] = [];
   // Whitespace at a text edge: TSProse reads a line break as a space; standard JSX drops whitespace with a line break.
-  const edgeSep = (ws: string): Sep => (ctx.jsxInput && /[\r\n]/.test(ws) ? 'none' : sepOf(ws));
+  const edgeSep = (ws: string): Sep =>
+    ctx.jsxInput && /[\r\n]/.test(ws) ? 'none' : sepOf(ws);
   let pending: Sep = 'none';
   let forceGlue = false;
 
@@ -464,7 +559,8 @@ function inlineTokens(children: Child[], indent: string, ctx: Ctx): Token[] {
         const parts = body.split(/([ \t\r\n\f]+)/);
         for (let i = 0; i < parts.length; i++) {
           const part = parts[i]!;
-          if (i % 2 === 1) pending = maxSep(pending, ctx.jsxInput ? 'space' : sepOf(part));
+          if (i % 2 === 1)
+            pending = maxSep(pending, ctx.jsxInput ? 'space' : sepOf(part));
           else if (part) push(part);
         }
         pending = maxSep(pending, edgeSep(trail));
@@ -481,12 +577,16 @@ function inlineTokens(children: Child[], indent: string, ctx: Ctx): Token[] {
           break;
         }
         const n = child.node;
-        push(reindent(verbatim(n, ctx), lineIndent(ctx.source, n.start), indent));
+        push(
+          reindent(verbatim(n, ctx), lineIndent(ctx.source, n.start), indent),
+        );
         break;
       }
       case 'comment': {
         const n = child.node;
-        push(reindent(verbatim(n, ctx), lineIndent(ctx.source, n.start), indent));
+        push(
+          reindent(verbatim(n, ctx), lineIndent(ctx.source, n.start), indent),
+        );
         break;
       }
       case 'element': {
@@ -502,7 +602,12 @@ function inlineTokens(children: Child[], indent: string, ctx: Ctx): Token[] {
         }
         push(openTag(node, indent, ctx, false, true));
         const innerTokens = inlineTokens(grand, indent, ctx);
-        innerTokens.forEach((t, i) => tokens.push({ text: t.text, glueBefore: i === 0 ? true : t.glueBefore }));
+        innerTokens.forEach((t, i) =>
+          tokens.push({
+            text: t.text,
+            glueBefore: i === 0 ? true : t.glueBefore,
+          }),
+        );
         pending = 'none';
         forceGlue = false;
         push(closeTag(node), true);
@@ -527,7 +632,10 @@ function fill(tokens: Token[], indent: string, ctx: Ctx): string {
     const t = tokens[k]!;
     if (t.glueBefore) return false;
     const prev = tokens[k - 1]!;
-    return !ctx.closing.includes(t.text[0]!) && !ctx.opening.includes(prev.text[prev.text.length - 1]!);
+    return (
+      !ctx.closing.includes(t.text[0]!) &&
+      !ctx.opening.includes(prev.text[prev.text.length - 1]!)
+    );
   };
   let i = 0;
   while (i < tokens.length) {
@@ -548,7 +656,10 @@ function fill(tokens: Token[], indent: string, ctx: Ctx): string {
       line = indent + unit;
     }
     const lastNl = unit.lastIndexOf('\n');
-    col = lastNl === -1 ? line.length - (line.lastIndexOf('\n') + 1) : unit.length - lastNl - 1;
+    col =
+      lastNl === -1
+        ? line.length - (line.lastIndexOf('\n') + 1)
+        : unit.length - lastNl - 1;
     i = j;
   }
   lines.push(line);

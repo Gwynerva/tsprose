@@ -11,17 +11,29 @@ export const SnippetSchema = s.object({
 export const kit = createTagKit({
   common: {
     always: { debugLabel: s.optional(s.string()) },
-    refable: { toc: s.optional(s.union(s.boolean(), s.string())), snippet: s.optional(SnippetSchema) },
+    refable: {
+      toc: s.optional(s.union(s.boolean(), s.string())),
+      snippet: s.optional(SnippetSchema),
+    },
   },
   meta: { title: s.optional(s.string()) },
   wrapLooseInline: P,
   onElement({ node, props, report }) {
     const toc = node.meta.toc;
-    const snippetTitle = (node.meta.snippet as { title?: string } | undefined)?.title;
-    const title = typeof toc === 'string' ? toc : snippetTitle ?? (typeof props.title === 'string' ? props.title : undefined);
+    const snippetTitle = (node.meta.snippet as { title?: string } | undefined)
+      ?.title;
+    const title =
+      typeof toc === 'string'
+        ? toc
+        : (snippetTitle ??
+          (typeof props.title === 'string' ? props.title : undefined));
     if (title !== undefined) node.meta.title = title;
     if (toc === true && title === undefined) {
-      report('kit/toc-title', `<${node.type}> is in the table of contents but has no title`, 'warning');
+      report(
+        'kit/toc-title',
+        `<${node.type}> is in the table of contents but has no title`,
+        'warning',
+      );
     }
   },
   onInclude(node) {

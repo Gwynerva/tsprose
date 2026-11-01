@@ -30,7 +30,9 @@ export interface ChildrenRule {
    * A number means "exactly", a pair `[min, max]` a range (`max` may be `Infinity`). Types not listed are unlimited.
    * The order-free complement of `pattern` (which is a sequence).
    */
-  readonly counts?: Readonly<Record<string, number | readonly [number, number]>>;
+  readonly counts?: Readonly<
+    Record<string, number | readonly [number, number]>
+  >;
   /**
    * `'preserve'`: keep text children exactly as written (no whitespace collapsing or trimming), for verbatim
    * content such as diagram sources or code. Default `'normalize'`.
@@ -41,7 +43,11 @@ export interface ChildrenRule {
 export type ChildrenSpec = 'none' | ChildrenOf | ChildrenRule;
 
 /** Report a problem from a definition callback; it lands in `node.diagnostics` (with the element's position). */
-export type ReportFn = (code: string, message: string, severity?: Severity) => void;
+export type ReportFn = (
+  code: string,
+  message: string,
+  severity?: Severity,
+) => void;
 
 export interface DataContext<P extends PropsInput, C extends ChildrenSpec> {
   readonly props: PropsOf<P>;
@@ -66,7 +72,9 @@ export interface NormalizeContext<P extends PropsInput> {
 }
 
 /** Return the new children: nodes, strings, arrays or JSX (flattened again), or `undefined` for none. */
-export type NormalizeFn<P extends PropsInput> = (ctx: NormalizeContext<P>) => unknown;
+export type NormalizeFn<P extends PropsInput> = (
+  ctx: NormalizeContext<P>,
+) => unknown;
 
 export interface DeriveContext {
   /** Opaque integrator context passed to `compile({ context })`. */
@@ -118,8 +126,14 @@ export interface Def<
   readonly ref: R;
   readonly data?: ((ctx: DataContext<P, C>) => D) | undefined;
   readonly normalize?: NormalizeFn<P> | undefined;
-  readonly key?: ((node: Node<Def<Name, K, P, C, R, D>>) => string | undefined) | undefined;
-  readonly derive?: ((node: Node<Def<Name, K, P, C, R, D>>, ctx: DeriveContext) => V | Promise<V>) | undefined;
+  readonly key?:
+    ((node: Node<Def<Name, K, P, C, R, D>>) => string | undefined) | undefined;
+  readonly derive?:
+    | ((
+        node: Node<Def<Name, K, P, C, R, D>>,
+        ctx: DeriveContext,
+      ) => V | Promise<V>)
+    | undefined;
   readonly common?: O | undefined;
 }
 
@@ -182,7 +196,12 @@ export function resolveChildrenRule(def: BaseDef): ResolvedChildrenRule {
   let counts: Map<string, readonly [number, number]> | undefined;
 
   if (spec === 'none') {
-    const rule: ResolvedChildrenRule = { mode: 'none', min: 0, max: 0, context: 'none' };
+    const rule: ResolvedChildrenRule = {
+      mode: 'none',
+      min: 0,
+      max: 0,
+      context: 'none',
+    };
     ruleCache.set(def, rule);
     return rule;
   }
@@ -194,9 +213,12 @@ export function resolveChildrenRule(def: BaseDef): ResolvedChildrenRule {
     if (spec.counts) {
       counts = new Map();
       for (const [type, limit] of Object.entries(spec.counts)) {
-        const range: readonly [number, number] = typeof limit === 'number' ? [limit, limit] : [limit[0], limit[1]];
+        const range: readonly [number, number] =
+          typeof limit === 'number' ? [limit, limit] : [limit[0], limit[1]];
         if (!(range[0] >= 0) || !(range[1] >= range[0])) {
-          throw new RangeError(`<${def.name}> children counts for "${type}" must be 0 ≤ min ≤ max, got ${JSON.stringify(limit)}`);
+          throw new RangeError(
+            `<${def.name}> children counts for "${type}" must be 0 ≤ min ≤ max, got ${JSON.stringify(limit)}`,
+          );
         }
         counts.set(type, range);
       }
@@ -206,7 +228,10 @@ export function resolveChildrenRule(def: BaseDef): ResolvedChildrenRule {
   }
 
   let rule: ResolvedChildrenRule;
-  const arity = { min: min ?? (pattern ? 0 : 1), max: max ?? Number.POSITIVE_INFINITY };
+  const arity = {
+    min: min ?? (pattern ? 0 : 1),
+    max: max ?? Number.POSITIVE_INFINITY,
+  };
 
   if (of === undefined || of === 'any') {
     rule = { mode: 'any', ...arity, pattern, context: 'mixed' };
@@ -222,18 +247,22 @@ export function resolveChildrenRule(def: BaseDef): ResolvedChildrenRule {
       if (tag.def.kind === 'block') hasBlock = true;
       else hasInline = true;
     }
-    const context: ChildrenContext = hasBlock && hasInline ? 'mixed' : hasBlock ? 'block' : 'inline';
+    const context: ChildrenContext =
+      hasBlock && hasInline ? 'mixed' : hasBlock ? 'block' : 'inline';
     rule = { mode: 'tags', tags, ...arity, pattern, context };
   }
 
-  if (isChildrenRule(spec) && spec.whitespace === 'preserve') rule = { ...rule, preserveWhitespace: true };
+  if (isChildrenRule(spec) && spec.whitespace === 'preserve')
+    rule = { ...rule, preserveWhitespace: true };
 
   if (counts) {
     rule = { ...rule, counts };
     const known = rule.tags ? new Set(rule.tags.keys()) : undefined;
     for (const type of counts.keys()) {
       if (known && !known.has(type)) {
-        throw new SyntaxError(`<${def.name}> children counts mention "${type}" which is not in its children list`);
+        throw new SyntaxError(
+          `<${def.name}> children counts mention "${type}" which is not in its children list`,
+        );
       }
     }
   }

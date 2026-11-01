@@ -24,7 +24,8 @@ export const DEFAULT_OPENING = '([{«“‘';
  * `\r` (never the `\r` of a `\r\n` pair: CRLF must not look like a blank line). Global, with one capturing group,
  * so it works with `exec` loops and with `split` (separators land at odd indexes).
  */
-export const BLANK_RUN = /((?:\r\n|\r(?!\n)|\n)[ \t\f]*(?:(?:\r\n|\r(?!\n)|\n)[ \t\f]*)+)/g;
+export const BLANK_RUN =
+  /((?:\r\n|\r(?!\n)|\n)[ \t\f]*(?:(?:\r\n|\r(?!\n)|\n)[ \t\f]*)+)/g;
 
 //
 // Parsing and walking
@@ -57,18 +58,36 @@ export function langOf(fileName: string): 'ts' | 'tsx' | 'jsx' {
 }
 
 /** Parse a prose file (an ES module) with oxc, choosing the language from the file name. */
-export function parseProse(source: string, fileName: string): ParseResult & { program: OxcNode } {
-  return parseSync(fileName, source, { sourceType: 'module', lang: langOf(fileName) }) as ParseResult & { program: OxcNode };
+export function parseProse(
+  source: string,
+  fileName: string,
+): ParseResult & { program: OxcNode } {
+  return parseSync(fileName, source, {
+    sourceType: 'module',
+    lang: langOf(fileName),
+  }) as ParseResult & { program: OxcNode };
 }
 
 /** Keys that never hold child nodes (positions, ESLint back links and token lists). */
-const SKIP_KEYS = new Set(['type', 'start', 'end', 'range', 'loc', 'parent', 'tokens', 'comments']);
+const SKIP_KEYS = new Set([
+  'type',
+  'start',
+  'end',
+  'range',
+  'loc',
+  'parent',
+  'tokens',
+  'comments',
+]);
 
 /**
  * Depth-first walk over every node under `root` (arrays included). `visit` returns `false` to skip the node's
  * children. `parent` is the closest enclosing node.
  */
-export function walkAst<N extends AstNode = AstNode>(root: unknown, visit: (node: N, parent: N | undefined) => void | boolean): void {
+export function walkAst<N extends AstNode = AstNode>(
+  root: unknown,
+  visit: (node: N, parent: N | undefined) => void | boolean,
+): void {
   const walk = (value: unknown, parent: N | undefined): void => {
     if (!value || typeof value !== 'object') return;
     if (Array.isArray(value)) {
@@ -102,7 +121,9 @@ export function jsxName(node: AstNode | undefined): string | undefined {
     case 'JSXMemberExpression': {
       const object = jsxName(node.object as AstNode);
       const property = jsxName(node.property as AstNode);
-      return object === undefined || property === undefined ? undefined : `${object}.${property}`;
+      return object === undefined || property === undefined
+        ? undefined
+        : `${object}.${property}`;
     }
     case 'JSXNamespacedName':
       return `${jsxName(node.namespace as AstNode)}:${jsxName(node.name as AstNode)}`;
@@ -113,7 +134,10 @@ export function jsxName(node: AstNode | undefined): string | undefined {
 
 /** Tag name of a `JSXElement` (`undefined` for fragments). */
 export function elementName(element: AstNode): string | undefined {
-  return jsxName((element.openingElement as AstNode | undefined)?.name as AstNode | undefined);
+  return jsxName(
+    (element.openingElement as AstNode | undefined)?.name as
+      AstNode | undefined,
+  );
 }
 
 //
@@ -130,19 +154,35 @@ export function elementName(element: AstNode): string | undefined {
  * - `comment`: `{/* … *\/}`; `element` / `fragment`; `expression`: anything else.
  */
 export type JsxChild<N extends AstNode = AstNode> =
-  | { readonly kind: 'text' | 'whitespace'; readonly node: N; readonly raw: string }
-  | { readonly kind: 'space' | 'glue' | 'break' | 'string'; readonly node: N; readonly value: string }
+  | {
+      readonly kind: 'text' | 'whitespace';
+      readonly node: N;
+      readonly raw: string;
+    }
+  | {
+      readonly kind: 'space' | 'glue' | 'break' | 'string';
+      readonly node: N;
+      readonly value: string;
+    }
   | { readonly kind: 'template'; readonly node: N }
   | { readonly kind: 'literal'; readonly node: N; readonly value: unknown }
   | { readonly kind: 'comment'; readonly node: N }
-  | { readonly kind: 'element'; readonly node: N; readonly name: string | undefined }
+  | {
+      readonly kind: 'element';
+      readonly node: N;
+      readonly name: string | undefined;
+    }
   | { readonly kind: 'fragment'; readonly node: N }
   | { readonly kind: 'expression'; readonly node: N; readonly expression: N };
 
 /** Value of a string literal or of a template literal without substitutions; `undefined` otherwise. */
 export function staticString(expression: AstNode): string | undefined {
-  if (expression.type === 'Literal') return typeof expression.value === 'string' ? expression.value : undefined;
-  if (expression.type === 'TemplateLiteral' && (expression.expressions as AstNode[]).length === 0) {
+  if (expression.type === 'Literal')
+    return typeof expression.value === 'string' ? expression.value : undefined;
+  if (
+    expression.type === 'TemplateLiteral' &&
+    (expression.expressions as AstNode[]).length === 0
+  ) {
     const quasi = (expression.quasis as AstNode[])[0];
     if (!quasi) return '';
     const value = quasi.value as { cooked?: string | null; raw: string };
@@ -152,24 +192,40 @@ export function staticString(expression: AstNode): string | undefined {
 }
 
 /** Classify a JSX child (see {@link JsxChild}). */
-export function classifyJsxChild<N extends AstNode>(child: N, source: string): JsxChild<N> {
+export function classifyJsxChild<N extends AstNode>(
+  child: N,
+  source: string,
+): JsxChild<N> {
   switch (child.type) {
     case 'JSXText': {
       const [s, e] = rangeOf(child);
       const raw = source.slice(s, e);
-      return { kind: isJsxWhitespace(raw) ? 'whitespace' : 'text', node: child, raw };
+      return {
+        kind: isJsxWhitespace(raw) ? 'whitespace' : 'text',
+        node: child,
+        raw,
+      };
     }
     case 'JSXExpressionContainer': {
       const expression = child.expression as N;
-      if (expression.type === 'JSXEmptyExpression') return { kind: 'comment', node: child };
+      if (expression.type === 'JSXEmptyExpression')
+        return { kind: 'comment', node: child };
       const value = staticString(expression);
       if (value !== undefined) {
         const kind =
-          value === '' ? 'glue' : value === PARAGRAPH_SEPARATOR ? 'break' : isJsxWhitespace(value) ? 'space' : 'string';
+          value === ''
+            ? 'glue'
+            : value === PARAGRAPH_SEPARATOR
+              ? 'break'
+              : isJsxWhitespace(value)
+                ? 'space'
+                : 'string';
         return { kind, node: child, value };
       }
-      if (expression.type === 'TemplateLiteral') return { kind: 'template', node: child };
-      if (expression.type === 'Literal') return { kind: 'literal', node: child, value: expression.value };
+      if (expression.type === 'TemplateLiteral')
+        return { kind: 'template', node: child };
+      if (expression.type === 'Literal')
+        return { kind: 'literal', node: child, value: expression.value };
       return { kind: 'expression', node: child, expression };
     }
     case 'JSXElement':
@@ -268,7 +324,10 @@ export function computeLineStarts(source: string): number[] {
 }
 
 /** 1-based line and column of an offset, given {@link computeLineStarts}. */
-export function positionOf(lineStarts: readonly number[], offset: number): { line: number; column: number } {
+export function positionOf(
+  lineStarts: readonly number[],
+  offset: number,
+): { line: number; column: number } {
   let lo = 0;
   let hi = lineStarts.length - 1;
   while (lo < hi) {
@@ -290,7 +349,10 @@ export const PROSE_FILE = /\.(tsx|jsx)$/;
  * Prose files under `path` (or `path` itself when it is a file), depth first. `node_modules` and dot-entries are
  * skipped. Throws `ENOENT` for a missing path.
  */
-export async function* walkProseFiles(path: string, pattern: RegExp = PROSE_FILE): AsyncGenerator<string> {
+export async function* walkProseFiles(
+  path: string,
+  pattern: RegExp = PROSE_FILE,
+): AsyncGenerator<string> {
   const info = await stat(path);
   if (info.isFile()) {
     yield path;
@@ -305,7 +367,9 @@ export async function* walkProseFiles(path: string, pattern: RegExp = PROSE_FILE
 }
 
 /** The paths of `paths` that do not exist. */
-export async function missingPaths(paths: readonly string[]): Promise<string[]> {
+export async function missingPaths(
+  paths: readonly string[],
+): Promise<string[]> {
   const missing: string[] = [];
   for (const path of paths) {
     try {
@@ -374,7 +438,12 @@ export interface LoadedConfig {
 }
 
 function isTagsDescriptionJson(value: unknown): value is TagsDescriptionJson {
-  return typeof value === 'object' && value !== null && (value as TagsDescriptionJson).version === 1 && typeof (value as TagsDescriptionJson).tags === 'object';
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    (value as TagsDescriptionJson).version === 1 &&
+    typeof (value as TagsDescriptionJson).tags === 'object'
+  );
 }
 
 async function readJson(path: string): Promise<unknown> {
@@ -390,27 +459,53 @@ export async function loadTsproseConfig(path: string): Promise<LoadedConfig> {
   const absolute = resolve(path);
   if (absolute.endsWith('.json')) {
     const json = await readJson(absolute);
-    if (!isTagsDescriptionJson(json)) throw new Error(`${path}: not a TSProse tags description (expected { version: 1, tags })`);
-    return { path: absolute, config: { manifest: json }, module: undefined, warnings: [] };
+    if (!isTagsDescriptionJson(json))
+      throw new Error(
+        `${path}: not a TSProse tags description (expected { version: 1, tags })`,
+      );
+    return {
+      path: absolute,
+      config: { manifest: json },
+      module: undefined,
+      warnings: [],
+    };
   }
-  const module = (await import(pathToFileURL(absolute).href)) as Record<string, unknown>;
-  const raw = (module.default && typeof module.default === 'object' ? module.default : module) as TsproseConfig;
+  const module = (await import(pathToFileURL(absolute).href)) as Record<
+    string,
+    unknown
+  >;
+  const raw = (
+    module.default && typeof module.default === 'object'
+      ? module.default
+      : module
+  ) as TsproseConfig;
   let manifest = raw.manifest;
   if (typeof manifest === 'string') {
     const file = resolve(dirname(absolute), manifest);
     const json = await readJson(file);
-    if (!isTagsDescriptionJson(json)) throw new Error(`${file}: not a TSProse tags description (expected { version: 1, tags })`);
+    if (!isTagsDescriptionJson(json))
+      throw new Error(
+        `${file}: not a TSProse tags description (expected { version: 1, tags })`,
+      );
     manifest = json;
   } else if (manifest !== undefined && !isTagsDescriptionJson(manifest)) {
-    throw new Error(`${path}: "manifest" must be a tags description or a path to one`);
+    throw new Error(
+      `${path}: "manifest" must be a tags description or a path to one`,
+    );
   }
   const warnings: string[] = [];
-  const sources = (['manifest', 'tags', 'inlineTags'] as const).filter((key) => raw[key] !== undefined);
+  const sources = (['manifest', 'tags', 'inlineTags'] as const).filter(
+    (key) => raw[key] !== undefined,
+  );
   if (sources.length > 1) {
-    warnings.push(`${path}: ${sources.map((k) => `"${k}"`).join(' and ')} both describe tags; "${sources[0]}" is used, the rest is ignored`);
+    warnings.push(
+      `${path}: ${sources.map((k) => `"${k}"`).join(' and ')} both describe tags; "${sources[0]}" is used, the rest is ignored`,
+    );
   }
   if (raw.compactContainers?.length && raw.separateBlocks !== true) {
-    warnings.push(`${path}: "compactContainers" has no effect without "separateBlocks: true"`);
+    warnings.push(
+      `${path}: "compactContainers" has no effect without "separateBlocks: true"`,
+    );
   }
   return { path: absolute, config: { ...raw, manifest }, module, warnings };
 }

@@ -1,5 +1,12 @@
 import { transform } from '@tsprose/transform';
-import { detectEol, parseProse, restoreEol, toLf, walkAst, type OxcNode } from '@tsprose/transform/tooling';
+import {
+  detectEol,
+  parseProse,
+  restoreEol,
+  toLf,
+  walkAst,
+  type OxcNode,
+} from '@tsprose/transform/tooling';
 import { format, type FormatOptions, type FormatResult } from './format.js';
 
 /** Options passed to oxfmt (its `FormatConfig`); typed loosely so oxfmt stays an optional dependency. */
@@ -23,16 +30,24 @@ export interface PipelineOptions extends FormatOptions {
 }
 
 interface OxfmtModule {
-  format(fileName: string, code: string, options?: object): Promise<{ code: string; errors: { message: string }[] }>;
+  format(
+    fileName: string,
+    code: string,
+    options?: object,
+  ): Promise<{ code: string; errors: { message: string }[] }>;
 }
 
 let oxfmtModule: Promise<OxfmtModule> | undefined;
 
 function loadOxfmt(): Promise<OxfmtModule> {
-  oxfmtModule ??= (import('oxfmt' as string) as Promise<OxfmtModule>).catch((error: unknown) => {
-    oxfmtModule = undefined;
-    throw new Error(`preFormat "oxfmt" needs the oxfmt package (bun add -d oxfmt): ${(error as Error).message}`);
-  });
+  oxfmtModule ??= (import('oxfmt' as string) as Promise<OxfmtModule>).catch(
+    (error: unknown) => {
+      oxfmtModule = undefined;
+      throw new Error(
+        `preFormat "oxfmt" needs the oxfmt package (bun add -d oxfmt): ${(error as Error).message}`,
+      );
+    },
+  );
   return oxfmtModule;
 }
 
@@ -53,17 +68,25 @@ async function runPreFormat(
     endOfLine,
     ...extra,
   });
-  if (result.errors.length) throw new Error(result.errors.map((e) => e.message).join('\n'));
+  if (result.errors.length)
+    throw new Error(result.errors.map((e) => e.message).join('\n'));
   return result.code;
 }
 
 /** Tagged templates written as JSX children (`{m`…`}`, `{display({ numbered: true })`…`}`): prose content, not code. */
-function proseTemplates(source: string, fileName: string): OxcNode[] | undefined {
+function proseTemplates(
+  source: string,
+  fileName: string,
+): OxcNode[] | undefined {
   const parsed = parseProse(source, fileName);
   if (parsed.errors.length) return undefined;
   const out: OxcNode[] = [];
   walkAst<OxcNode>(parsed.program, (n, parent) => {
-    if (n.type === 'TaggedTemplateExpression' && parent?.type === 'JSXExpressionContainer') out.push(n);
+    if (
+      n.type === 'TaggedTemplateExpression' &&
+      parent?.type === 'JSXExpressionContainer'
+    )
+      out.push(n);
   });
   return out;
 }
@@ -73,7 +96,9 @@ function templateKey(node: OxcNode): string {
   let tag = node.tag as OxcNode;
   while (tag.type === 'CallExpression') tag = tag.callee as OxcNode;
   const name = tag.type === 'Identifier' ? (tag.name as string) : tag.type;
-  const quasis = ((node.quasi as OxcNode).quasis as OxcNode[]).map((q) => (q.value as { raw: string }).raw);
+  const quasis = ((node.quasi as OxcNode).quasis as OxcNode[]).map(
+    (q) => (q.value as { raw: string }).raw,
+  );
   return `${name}\0${toLf(quasis.join('\0'))}`;
 }
 
@@ -82,15 +107,28 @@ function templateKey(node: OxcNode): string {
  * call (`m({\n color: true,\n })`…``). Matched by order; nothing is replaced unless every pair has the same
  * tag name and template text.
  */
-function keepProseTemplates(original: string, formatted: string, fileName: string): string {
+function keepProseTemplates(
+  original: string,
+  formatted: string,
+  fileName: string,
+): string {
   const before = proseTemplates(original, fileName);
   const after = proseTemplates(formatted, fileName);
-  if (!before || !after || before.length !== after.length || before.length === 0) return formatted;
-  if (before.some((node, i) => templateKey(node) !== templateKey(after[i]!))) return formatted;
+  if (
+    !before ||
+    !after ||
+    before.length !== after.length ||
+    before.length === 0
+  )
+    return formatted;
+  if (before.some((node, i) => templateKey(node) !== templateKey(after[i]!)))
+    return formatted;
   let out = '';
   let cursor = 0;
   after.forEach((node, i) => {
-    out += formatted.slice(cursor, node.start) + original.slice(before[i]!.start, before[i]!.end);
+    out +=
+      formatted.slice(cursor, node.start) +
+      original.slice(before[i]!.start, before[i]!.end);
     cursor = node.end;
   });
   return out + formatted.slice(cursor);
@@ -107,7 +145,11 @@ function keepProseTemplates(original: string, formatted: string, fileName: strin
  * 3. the prose pass re-prints the prose trees, turning those markers back into line breaks and blank lines.
  * Without `preFormat` this is exactly {@link format}.
  */
-export async function formatAsync(source: string, fileName: string, options: PipelineOptions = {}): Promise<FormatResult> {
+export async function formatAsync(
+  source: string,
+  fileName: string,
+  options: PipelineOptions = {},
+): Promise<FormatResult> {
   const pre = options.preFormat;
   if (!pre) return format(source, fileName, options);
   // The whole pipeline runs on LF text; the file's line endings are restored at the end. (Handing CRLF text to a
@@ -119,10 +161,19 @@ export async function formatAsync(source: string, fileName: string, options: Pip
     const standard =
       options.transform === false
         ? lf
-        : transform(lf, fileName, { paragraphs: true, sourceMap: false, closing: options.closing, opening: options.opening }).code;
+        : transform(lf, fileName, {
+            paragraphs: true,
+            sourceMap: false,
+            closing: options.closing,
+            opening: options.opening,
+          }).code;
     input = await runPreFormat(pre, standard, fileName, options, 'lf');
   } catch (error) {
-    return { code: source, changed: false, errors: [`preFormat failed: ${(error as Error).message}`] };
+    return {
+      code: source,
+      changed: false,
+      errors: [`preFormat failed: ${(error as Error).message}`],
+    };
   }
   input = restoreEol(keepProseTemplates(lf, toLf(input), fileName), eol);
   // The code formatter's output is standard JSX: read it as such, print it with the TSProse rules.

@@ -12,8 +12,11 @@ Workspace settings example:
 
 ```jsonc
 {
-  "[typescriptreact]": { "editor.defaultFormatter": "tsprose.vscode-tsprose", "editor.formatOnSave": true },
-  "tsprose.fmt.config": "tsprose.config.ts"
+  "[typescriptreact]": {
+    "editor.defaultFormatter": "tsprose.vscode-tsprose",
+    "editor.formatOnSave": true,
+  },
+  "tsprose.fmt.config": "tsprose.config.ts",
 }
 ```
 

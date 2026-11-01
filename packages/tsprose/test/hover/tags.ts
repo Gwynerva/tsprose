@@ -37,7 +37,11 @@ export const Callout = kit.defineBlock({
 });
 
 /** Level-one heading preset. */
-export const H1 = defineBlock({ name: 'heading', props: { /** 1..3 */ level: s.enum([1, 2, 3]) }, children: 'inline' }).with({ level: 1 });
+export const H1 = defineBlock({
+  name: 'heading',
+  props: { /** 1..3 */ level: s.enum([1, 2, 3]) },
+  children: 'inline',
+}).with({ level: 1 });
 
 /** Answer check. */
 export const Check = defineBlock({

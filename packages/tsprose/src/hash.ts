@@ -1,6 +1,7 @@
 import { sha256 } from '@noble/hashes/sha2.js';
 
-const ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+const ALPHABET =
+  '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
 const encoder = new TextEncoder();
 
 /**

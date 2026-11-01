@@ -1,7 +1,12 @@
 import { buildChildren, flattenChildren } from './children.js';
 import { resolveChildrenRule, type BaseDef } from './def.js';
 import { DiagnosticBag, type SourcePos } from './diagnostics.js';
-import { FRAGMENT_TYPE, isAnyNode, type AnyNode, type BaseNode } from './node.js';
+import {
+  FRAGMENT_TYPE,
+  isAnyNode,
+  type AnyNode,
+  type BaseNode,
+} from './node.js';
 import type { KitRuntime } from './kit.js';
 import { isRef, isRefTarget, type Ref } from './ref.js';
 import { validateProps } from './standard.js';
@@ -35,13 +40,30 @@ export function getKit(node: BaseNode): KitRuntime | undefined {
   return (node as unknown as Record<symbol, KitRuntime | undefined>)[KIT];
 }
 
-export function attachDef(node: BaseNode, def: BaseDef, kit?: KitRuntime): void {
-  Object.defineProperty(node, DEF, { value: def, enumerable: false, configurable: true });
-  if (kit) Object.defineProperty(node, KIT, { value: kit, enumerable: false, configurable: true });
+export function attachDef(
+  node: BaseNode,
+  def: BaseDef,
+  kit?: KitRuntime,
+): void {
+  Object.defineProperty(node, DEF, {
+    value: def,
+    enumerable: false,
+    configurable: true,
+  });
+  if (kit)
+    Object.defineProperty(node, KIT, {
+      value: kit,
+      enumerable: false,
+      configurable: true,
+    });
 }
 
 /** Create an element node from a tag and raw props. Never throws; problems land in `node.diagnostics`. */
-export function instantiate(tag: AnyTag, rawProps: Record<string, unknown>, ctx?: TagCallContext): BaseNode {
+export function instantiate(
+  tag: AnyTag,
+  rawProps: Record<string, unknown>,
+  ctx?: TagCallContext,
+): BaseNode {
   const def = tag.def;
   const kit = tag.kit;
   const pos = ctx?.pos;
@@ -60,7 +82,13 @@ export function instantiate(tag: AnyTag, rawProps: Record<string, unknown>, ctx?
 
   const own = validateProps(def.props, ownInput);
   for (const issue of own.issues) {
-    bag.error(issue.message.startsWith('Unknown prop') ? 'props/unknown' : 'props/invalid', `<${def.name}> ${issue.message}`, pos);
+    bag.error(
+      issue.message.startsWith('Unknown prop')
+        ? 'props/unknown'
+        : 'props/invalid',
+      `<${def.name}> ${issue.message}`,
+      pos,
+    );
   }
   const common = validateProps(commonSpec, commonInput);
   for (const issue of common.issues) {
@@ -73,9 +101,14 @@ export function instantiate(tag: AnyTag, rawProps: Record<string, unknown>, ctx?
   const refArg = props.$;
   if (refArg !== undefined) {
     if (def.ref === 'none') {
-      bag.error('ref/forbidden', `<${def.name}> is not referable (ref: 'none') but received "$"`, pos);
+      bag.error(
+        'ref/forbidden',
+        `<${def.name}> is not referable (ref: 'none') but received "$"`,
+        pos,
+      );
     } else if (typeof refArg === 'string') {
-      if (!refArg.trim()) bag.error('ref/invalid', `<${def.name}> received an empty "$"`, pos);
+      if (!refArg.trim())
+        bag.error('ref/invalid', `<${def.name}> received an empty "$"`, pos);
       else ref = refArg;
     } else if (isRef(refArg)) {
       if (refArg.def !== def) {
@@ -90,16 +123,32 @@ export function instantiate(tag: AnyTag, rawProps: Record<string, unknown>, ctx?
     } else if (isRefTarget(refArg)) {
       // A serialized handle (`{ $ref: { documentId, name } }`), e.g. passed through JSON to a browser-side generator.
       if (refArg.$ref.name === undefined) {
-        bag.error('ref/invalid', `<${def.name}> received a whole-document reference as "$" (an element needs a name)`, pos);
+        bag.error(
+          'ref/invalid',
+          `<${def.name}> received a whole-document reference as "$" (an element needs a name)`,
+          pos,
+        );
       } else ref = refArg.$ref.name;
     } else {
-      bag.error('ref/invalid', `<${def.name}> received an invalid "$" (expected a Ref handle, a serialized { $ref } or a string)`, pos);
+      bag.error(
+        'ref/invalid',
+        `<${def.name}> received an invalid "$" (expected a Ref handle, a serialized { $ref } or a string)`,
+        pos,
+      );
     }
   } else if (def.ref === 'required') {
-    bag.error('ref/required', `<${def.name}> requires a ref: pass a handle from defineRefs via "$"`, pos);
+    bag.error(
+      'ref/required',
+      `<${def.name}> requires a ref: pass a handle from defineRefs via "$"`,
+      pos,
+    );
   }
 
-  const report = (code: string, message: string, severity: 'error' | 'warning' = 'error') => {
+  const report = (
+    code: string,
+    message: string,
+    severity: 'error' | 'warning' = 'error',
+  ) => {
     if (severity === 'error') bag.error(code, message, pos);
     else bag.warning(code, message, pos);
   };
@@ -107,7 +156,17 @@ export function instantiate(tag: AnyTag, rawProps: Record<string, unknown>, ctx?
   // Children
   const rule = resolveChildrenRule(def);
   const state: Record<string, unknown> = {};
-  const children = buildChildren({ raw: props.children, rule, def, kit, bag, pos, props: own.value, report, state });
+  const children = buildChildren({
+    raw: props.children,
+    rule,
+    def,
+    kit,
+    bag,
+    pos,
+    props: own.value,
+    report,
+    state,
+  });
 
   // Transient props shape normalize/data only; they are not stored on the node.
   let storedProps = own.value;
@@ -128,14 +187,21 @@ export function instantiate(tag: AnyTag, rawProps: Record<string, unknown>, ctx?
   };
   attachDef(node, def, kit);
   if (refHandle) {
-    Object.defineProperty(node, REF_HANDLE, { value: refHandle, enumerable: false });
+    Object.defineProperty(node, REF_HANDLE, {
+      value: refHandle,
+      enumerable: false,
+    });
   }
 
   if (def.data) {
     try {
       node.data = def.data({ props: own.value, children, node, report, state });
     } catch (error) {
-      bag.error('tag/data', `<${def.name}> data() threw: ${errorMessage(error)}`, pos);
+      bag.error(
+        'tag/data',
+        `<${def.name}> data() threw: ${errorMessage(error)}`,
+        pos,
+      );
     }
   }
 
@@ -149,7 +215,11 @@ export function instantiate(tag: AnyTag, rawProps: Record<string, unknown>, ctx?
         report,
       });
     } catch (error) {
-      bag.error('tag/hook', `<${def.name}> kit onElement threw: ${errorMessage(error)}`, pos);
+      bag.error(
+        'tag/hook',
+        `<${def.name}> kit onElement threw: ${errorMessage(error)}`,
+        pos,
+      );
     }
   }
 
@@ -158,7 +228,11 @@ export function instantiate(tag: AnyTag, rawProps: Record<string, unknown>, ctx?
 }
 
 /** Build a fragment node from raw children (no whitespace normalization; parents handle it). */
-export function makeFragment(rawChildren: unknown, pos?: SourcePos, diagnostics?: DiagnosticBag): BaseNode {
+export function makeFragment(
+  rawChildren: unknown,
+  pos?: SourcePos,
+  diagnostics?: DiagnosticBag,
+): BaseNode {
   const bag = diagnostics ?? new DiagnosticBag();
   const children = flattenChildren(rawChildren, bag, pos);
   const node: BaseNode = {
@@ -175,10 +249,15 @@ export function makeFragment(rawChildren: unknown, pos?: SourcePos, diagnostics?
   return node;
 }
 
-export type ComponentResult = AnyNode | string | number | null | undefined | readonly ComponentResult[];
+export type ComponentResult =
+  AnyNode | string | number | null | undefined | readonly ComponentResult[];
 
 /** What the JSX runtime calls for every `<X …>`. */
-export function createElement(type: unknown, props: Record<string, unknown> | null | undefined, pos?: SourcePos): BaseNode {
+export function createElement(
+  type: unknown,
+  props: Record<string, unknown> | null | undefined,
+  pos?: SourcePos,
+): BaseNode {
   const p = props ?? {};
   if (isTag(type)) {
     return type(p, { pos }) as BaseNode;
@@ -189,7 +268,11 @@ export function createElement(type: unknown, props: Record<string, unknown> | nu
       result = (type as (props: Record<string, unknown>) => unknown)(p);
     } catch (error) {
       const bag = new DiagnosticBag();
-      bag.error('tag/component', `Component ${type.name || '(anonymous)'} threw: ${errorMessage(error)}`, pos);
+      bag.error(
+        'tag/component',
+        `Component ${type.name || '(anonymous)'} threw: ${errorMessage(error)}`,
+        pos,
+      );
       return makeFragment(undefined, pos, bag);
     }
     if (isAnyNode(result) && !Array.isArray(result)) {

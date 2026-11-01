@@ -29,7 +29,11 @@ const WS_ONLY = /^[ \t\r\n\f\u2029]*$/;
  * are dropped, strings and numbers become text, adjacent texts are merged. No whitespace
  * normalization here (that depends on the parent's children context).
  */
-export function flattenChildren(raw: unknown, bag?: DiagnosticBag, pos?: SourcePos): AnyNode[] {
+export function flattenChildren(
+  raw: unknown,
+  bag?: DiagnosticBag,
+  pos?: SourcePos,
+): AnyNode[] {
   const out: AnyNode[] = [];
   const push = (node: AnyNode) => {
     const last = out[out.length - 1];
@@ -40,7 +44,8 @@ export function flattenChildren(raw: unknown, bag?: DiagnosticBag, pos?: SourceP
     }
   };
   const visit = (value: unknown): void => {
-    if (value === null || value === undefined || typeof value === 'boolean') return;
+    if (value === null || value === undefined || typeof value === 'boolean')
+      return;
     if (typeof value === 'string') {
       if (value !== '') push(makeTextNode(value));
       return;
@@ -76,7 +81,8 @@ export function flattenChildren(raw: unknown, bag?: DiagnosticBag, pos?: SourceP
 }
 
 function describeValue(value: unknown): string {
-  if (typeof value === 'function') return `function ${(value as { name?: string }).name || '(anonymous)'}`;
+  if (typeof value === 'function')
+    return `function ${(value as { name?: string }).name || '(anonymous)'}`;
   if (typeof value === 'object' && value !== null) {
     const v = value as { type?: unknown; name?: unknown };
     if (typeof v.name === 'string' && 'def' in v) return `ref "${v.name}"`;
@@ -109,34 +115,50 @@ function mergeTexts(nodes: AnyNode[]): AnyNode[] {
  * - block: drop whitespace-only texts (other texts stay for autowrap / diagnostics).
  * - mixed: collapse, drop whitespace texts touching block nodes or edges, trim around blocks.
  */
-export function normalizeWhitespace(nodes: AnyNode[], context: 'inline' | 'block' | 'mixed'): AnyNode[] {
+export function normalizeWhitespace(
+  nodes: AnyNode[],
+  context: 'inline' | 'block' | 'mixed',
+): AnyNode[] {
   if (nodes.length === 0) return nodes;
   if (context === 'block') {
     // Paragraph separators survive: the autowrap splits loose inline runs on them.
-    return nodes.filter((n) => !isWhitespaceOnly(n) || n.text.includes(PARAGRAPH_SEPARATOR));
+    return nodes.filter(
+      (n) => !isWhitespaceOnly(n) || n.text.includes(PARAGRAPH_SEPARATOR),
+    );
   }
-  let out = nodes.map((n) => (isTextNode(n) ? makeTextNode(collapse(n.text), n.pos) : n));
+  let out = nodes.map((n) =>
+    isTextNode(n) ? makeTextNode(collapse(n.text), n.pos) : n,
+  );
   if (context === 'mixed') {
-    const isBlock = (n: AnyNode | undefined) => !!n && isBaseNode(n) && n.kind === 'block';
+    const isBlock = (n: AnyNode | undefined) =>
+      !!n && isBaseNode(n) && n.kind === 'block';
     out = out.filter((n, i) => {
       if (!isWhitespaceOnly(n)) return true;
-      return !(i === 0 || i === out.length - 1 || isBlock(out[i - 1]) || isBlock(out[i + 1]));
+      return !(
+        i === 0 ||
+        i === out.length - 1 ||
+        isBlock(out[i - 1]) ||
+        isBlock(out[i + 1])
+      );
     });
     out = out.map((n, i) => {
       if (!isTextNode(n)) return n;
       let text = n.text;
       if (i === 0 || isBlock(out[i - 1])) text = text.replace(/^ /, '');
-      if (i === out.length - 1 || isBlock(out[i + 1])) text = text.replace(/ $/, '');
+      if (i === out.length - 1 || isBlock(out[i + 1]))
+        text = text.replace(/ $/, '');
       return makeTextNode(text, n.pos);
     });
     return mergeTexts(out);
   }
   // inline
   const first = out[0];
-  if (first && isTextNode(first)) out[0] = makeTextNode(first.text.replace(/^ /, ''), first.pos);
+  if (first && isTextNode(first))
+    out[0] = makeTextNode(first.text.replace(/^ /, ''), first.pos);
   const lastIndex = out.length - 1;
   const last = out[lastIndex];
-  if (last && isTextNode(last)) out[lastIndex] = makeTextNode(last.text.replace(/ $/, ''), last.pos);
+  if (last && isTextNode(last))
+    out[lastIndex] = makeTextNode(last.text.replace(/ $/, ''), last.pos);
   return mergeTexts(out);
 }
 
@@ -149,7 +171,9 @@ export interface BuildChildrenArgs {
   readonly pos: SourcePos | undefined;
   /** Validated own props (passed to the definition's `normalize`). */
   readonly props?: Readonly<Record<string, unknown>> | undefined;
-  readonly report?: ((code: string, message: string, severity?: 'error' | 'warning') => void) | undefined;
+  readonly report?:
+    | ((code: string, message: string, severity?: 'error' | 'warning') => void)
+    | undefined;
   readonly state?: Record<string, unknown> | undefined;
 }
 
@@ -161,12 +185,20 @@ export function buildChildren(args: BuildChildrenArgs): AnyNode[] | undefined {
 
   if (rule.mode === 'none') {
     if (nodes.length > 0) {
-      bag.error('children/forbidden', `${tagName} does not accept children`, pos);
+      bag.error(
+        'children/forbidden',
+        `${tagName} does not accept children`,
+        pos,
+      );
     }
     return undefined;
   }
 
-  if (!rule.preserveWhitespace) nodes = normalizeWhitespace(nodes, rule.context === 'none' ? 'mixed' : rule.context);
+  if (!rule.preserveWhitespace)
+    nodes = normalizeWhitespace(
+      nodes,
+      rule.context === 'none' ? 'mixed' : rule.context,
+    );
 
   // Loose inline content inside a block-only container: wrap or report.
   if (rule.context === 'block') {
@@ -179,17 +211,25 @@ export function buildChildren(args: BuildChildrenArgs): AnyNode[] | undefined {
       const rewritten = def.normalize({
         props: args.props ?? {},
         children: nodes,
-        report: args.report ?? ((code: string, message: string) => bag.error(code, message, pos)),
+        report:
+          args.report ??
+          ((code: string, message: string) => bag.error(code, message, pos)),
         state: args.state ?? {},
       });
-      nodes = rewritten === nodes ? nodes : flattenChildren(rewritten, bag, pos);
+      nodes =
+        rewritten === nodes ? nodes : flattenChildren(rewritten, bag, pos);
     } catch (error) {
-      bag.error('tag/normalize', `${tagName} normalize() threw: ${errorMessage(error)}`, pos);
+      bag.error(
+        'tag/normalize',
+        `${tagName} normalize() threw: ${errorMessage(error)}`,
+        pos,
+      );
     }
   }
 
   // Paragraph separators kept for normalize (see wrapLooseInline) are not content.
-  if (rule.context === 'block') nodes = nodes.filter((n) => !isWhitespaceOnly(n));
+  if (rule.context === 'block')
+    nodes = nodes.filter((n) => !isWhitespaceOnly(n));
 
   // Kind / type validation
   for (const child of nodes) {
@@ -222,18 +262,34 @@ export function buildChildren(args: BuildChildrenArgs): AnyNode[] | undefined {
       pos,
     );
   } else if (nodes.length > rule.max) {
-    bag.error('children/arity', `${tagName} accepts at most ${rule.max} children, received ${nodes.length}`, pos);
+    bag.error(
+      'children/arity',
+      `${tagName} accepts at most ${rule.max} children, received ${nodes.length}`,
+      pos,
+    );
   }
 
   // Occurrence counts (order-free)
   if (rule.counts) {
     const seen = new Map<string, number>();
-    for (const child of nodes) seen.set(child.type, (seen.get(child.type) ?? 0) + 1);
+    for (const child of nodes)
+      seen.set(child.type, (seen.get(child.type) ?? 0) + 1);
     for (const [type, [min, max]] of rule.counts) {
       const n = seen.get(type) ?? 0;
       if (n < min || n > max) {
-        const expected = min === max ? `exactly ${min}` : max === Number.POSITIVE_INFINITY ? `at least ${min}` : min === 0 ? `at most ${max}` : `${min} to ${max}`;
-        bag.error('children/count', `${tagName} requires ${expected} <${type}>, received ${n}`, pos);
+        const expected =
+          min === max
+            ? `exactly ${min}`
+            : max === Number.POSITIVE_INFINITY
+              ? `at least ${min}`
+              : min === 0
+                ? `at most ${max}`
+                : `${min} to ${max}`;
+        bag.error(
+          'children/count',
+          `${tagName} requires ${expected} <${type}>, received ${n}`,
+          pos,
+        );
       }
     }
   }
@@ -266,7 +322,12 @@ function wrapLooseInline(
     if (wrapper && (rule.mode !== 'tags' || rule.tags!.has(wrapper.def.name))) {
       const trimmed = normalizeWhitespace(run, 'inline');
       if (trimmed.length > 0) {
-        out.push(wrapper({ children: trimmed }, { pos: run[0]!.pos ?? pos }) as BaseNode);
+        out.push(
+          wrapper(
+            { children: trimmed },
+            { pos: run[0]!.pos ?? pos },
+          ) as BaseNode,
+        );
       }
     } else {
       // No applicable wrapper: leave the nodes in place, the kind/type checks report each of them.
@@ -274,7 +335,8 @@ function wrapLooseInline(
     }
     run = [];
   };
-  const applicable = !!wrapper && (rule.mode !== 'tags' || rule.tags!.has(wrapper.def.name));
+  const applicable =
+    !!wrapper && (rule.mode !== 'tags' || rule.tags!.has(wrapper.def.name));
   let previousWasRun = false;
   for (const segment of segmentLooseInline(nodes)) {
     if (segment.block) {
@@ -283,7 +345,8 @@ function wrapLooseInline(
     } else {
       // Without an applicable wrapper the runs stay loose; keep the paragraph break between consecutive runs
       // so a definition's normalize can still wrap them paragraph by paragraph.
-      if (!applicable && previousWasRun) out.push(makeTextNode(PARAGRAPH_SEPARATOR));
+      if (!applicable && previousWasRun)
+        out.push(makeTextNode(PARAGRAPH_SEPARATOR));
       run = segment.inline;
       flush();
       previousWasRun = true;
@@ -292,7 +355,9 @@ function wrapLooseInline(
   return out;
 }
 
-export type LooseSegment = { readonly block: AnyNode; readonly inline?: undefined } | { readonly block?: undefined; readonly inline: AnyNode[] };
+export type LooseSegment =
+  | { readonly block: AnyNode; readonly inline?: undefined }
+  | { readonly block?: undefined; readonly inline: AnyNode[] };
 
 /**
  * Split children of a block container into block nodes and runs of loose inline content.
@@ -324,13 +389,17 @@ export function segmentLooseInline(nodes: readonly AnyNode[]): LooseSegment[] {
   return out;
 }
 
-function childPos(child: AnyNode, fallback: SourcePos | undefined): SourcePos | undefined {
+function childPos(
+  child: AnyNode,
+  fallback: SourcePos | undefined,
+): SourcePos | undefined {
   return child.pos ?? fallback;
 }
 
 export function describeNode(node: AnyNode): string {
   if (isTextNode(node)) {
-    const preview = node.text.length > 24 ? `${node.text.slice(0, 21)}…` : node.text;
+    const preview =
+      node.text.length > 24 ? `${node.text.slice(0, 21)}…` : node.text;
     return `text "${preview}"`;
   }
   return `<${node.type}>`;

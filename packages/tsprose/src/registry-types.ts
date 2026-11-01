@@ -18,7 +18,10 @@ export interface RegistryTypesOptions {
  * `index.registryEntries()` after a build, {@link registryEntriesFromCorpus} without compiling, a database, a manifest.
  * Write the result to a `.d.ts` file included by the project's tsconfig.
  */
-export function generateRegistryTypes(entries: Iterable<RegistryEntry>, options: RegistryTypesOptions = {}): string {
+export function generateRegistryTypes(
+  entries: Iterable<RegistryEntry>,
+  options: RegistryTypesOptions = {},
+): string {
   const module = options.module ?? 'tsprose';
   const name = options.interfaceName ?? 'CorpusRegistry';
   const lines = [
@@ -30,12 +33,16 @@ export function generateRegistryTypes(entries: Iterable<RegistryEntry>, options:
   ];
   const sorted = [...entries].sort((a, b) => compareStrings(a.id, b.id));
   for (const entry of sorted) {
-    const names = Object.entries(entry.names).sort(([a], [b]) => compareStrings(a, b));
+    const names = Object.entries(entry.names).sort(([a], [b]) =>
+      compareStrings(a, b),
+    );
     if (!names.length) {
       lines.push(`    ${JSON.stringify(entry.id)}: {};`);
       continue;
     }
-    lines.push(`    ${JSON.stringify(entry.id)}: { ${names.map(([n, t]) => `${JSON.stringify(n)}: ${JSON.stringify(t)};`).join(' ')} };`);
+    lines.push(
+      `    ${JSON.stringify(entry.id)}: { ${names.map(([n, t]) => `${JSON.stringify(n)}: ${JSON.stringify(t)};`).join(' ')} };`,
+    );
   }
   lines.push('  }', '}', '');
   return lines.join('\n');
@@ -49,6 +56,10 @@ export function generateRegistryTypes(entries: Iterable<RegistryEntry>, options:
 export function registryEntriesFromCorpus(corpus: Corpus): RegistryEntry[] {
   return corpus.entries().map(([id, doc]) => ({
     id,
-    names: Object.fromEntries(doc.refs.flatMap((r) => listRefs(r)).map((handle) => [handle.name, handle.def.name])),
+    names: Object.fromEntries(
+      doc.refs
+        .flatMap((r) => listRefs(r))
+        .map((handle) => [handle.name, handle.def.name]),
+    ),
   }));
 }

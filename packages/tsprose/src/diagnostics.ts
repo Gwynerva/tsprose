@@ -27,7 +27,8 @@ export function formatPos(pos: SourcePos | undefined): string {
 export function formatDiagnostic(d: Diagnostic): string {
   const head = `${d.severity} ${d.code}: ${d.message}`;
   const where = `  at ${formatPos(d.pos)}`;
-  const path = d.path && d.path.length ? `  in ${d.path.join(' > ')}` : undefined;
+  const path =
+    d.path && d.path.length ? `  in ${d.path.join(' > ')}` : undefined;
   return [head, where, path].filter(Boolean).join('\n');
 }
 
@@ -44,7 +45,11 @@ export class TSProseError extends Error {
   readonly diagnostics: readonly Diagnostic[];
 
   constructor(message: string, diagnostics: readonly Diagnostic[] = []) {
-    super(diagnostics.length ? `${message}\n\n${formatDiagnostics(diagnostics)}` : message);
+    super(
+      diagnostics.length
+        ? `${message}\n\n${formatDiagnostics(diagnostics)}`
+        : message,
+    );
     this.name = 'TSProseError';
     this.diagnostics = diagnostics;
   }
@@ -54,11 +59,21 @@ export class TSProseError extends Error {
 export class DiagnosticBag {
   readonly items: Diagnostic[] = [];
 
-  error(code: string, message: string, pos?: SourcePos, path?: readonly string[]): void {
+  error(
+    code: string,
+    message: string,
+    pos?: SourcePos,
+    path?: readonly string[],
+  ): void {
     this.items.push({ severity: 'error', code, message, pos, path });
   }
 
-  warning(code: string, message: string, pos?: SourcePos, path?: readonly string[]): void {
+  warning(
+    code: string,
+    message: string,
+    pos?: SourcePos,
+    path?: readonly string[],
+  ): void {
     this.items.push({ severity: 'warning', code, message, pos, path });
   }
 

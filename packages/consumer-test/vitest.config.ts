@@ -4,7 +4,14 @@ export default defineConfig({
   test: {
     name: 'consumer-test',
     include: ['test/**/*.test.tsx'],
-    typecheck: { enabled: true, include: ['test/**/*.test-d.tsx'], tsconfig: './tsconfig.json', ignoreSourceErrors: false },
+    typecheck: {
+      enabled: true,
+      include: ['test/**/*.test-d.tsx'],
+      tsconfig: './tsconfig.json',
+      ignoreSourceErrors: false,
+    },
   },
-  oxc: { jsx: { runtime: 'automatic', importSource: 'tsprose', development: true } },
+  oxc: {
+    jsx: { runtime: 'automatic', importSource: 'tsprose', development: true },
+  },
 });

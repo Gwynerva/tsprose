@@ -5,5 +5,7 @@ export default defineConfig({
     name: 'analyzer',
     include: ['test/**/*.test.ts', 'test/**/*.test.tsx'],
   },
-  oxc: { jsx: { runtime: 'automatic', importSource: 'tsprose', development: true } },
+  oxc: {
+    jsx: { runtime: 'automatic', importSource: 'tsprose', development: true },
+  },
 });

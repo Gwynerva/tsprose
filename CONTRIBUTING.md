@@ -11,16 +11,16 @@ bun run check   # build → typecheck → test, everything CI runs
 
 ## Layout
 
-| Path | What |
-| --- | --- |
-| `packages/tsprose` | Core library (`src/`, runtime tests in `test/runtime`, type tests in `test/types`, registry-augmented type tests in `test/registry`). |
-| `packages/transform` | Whitespace transform, shared tooling helpers (`@tsprose/transform/tooling`), plugins. |
-| `packages/fmt` | Formatter and its CLI. |
-| `packages/analyzer` | `tsprose check` CLI, rules, ESLint plugin. |
-| `packages/vscode-tsprose` | VS Code extension (private, packaged with `vsce`). |
-| `packages/testbed` | Private proving ground: a site-generator-like kit, corpus build, rendering, benchmarks. |
-| `packages/consumer-test` | Private: compiles a small project against the built `dist` of the core. |
-| `scripts/` | Repository scripts (cross-platform package build). |
+| Path                      | What                                                                                                                                  |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/tsprose`        | Core library (`src/`, runtime tests in `test/runtime`, type tests in `test/types`, registry-augmented type tests in `test/registry`). |
+| `packages/transform`      | Whitespace transform, shared tooling helpers (`@tsprose/transform/tooling`), plugins.                                                 |
+| `packages/fmt`            | Formatter and its CLI.                                                                                                                |
+| `packages/analyzer`       | `tsprose check` CLI, rules, ESLint plugin.                                                                                            |
+| `packages/vscode-tsprose` | VS Code extension (private, packaged with `vsce`).                                                                                    |
+| `packages/testbed`        | Private proving ground: a site-generator-like kit, corpus build, rendering, benchmarks.                                               |
+| `packages/consumer-test`  | Private: compiles a small project against the built `dist` of the core.                                                               |
+| `scripts/`                | Repository scripts (cross-platform package build).                                                                                    |
 
 ## Guidelines
 

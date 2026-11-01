@@ -52,7 +52,17 @@ describe('walk', () => {
       'section/paragraph[2]@1',
       'section/paragraph[2]/text[0]@2',
     ]);
-    expect(leaves).toEqual(['text', 'text', 'bold', 'text', 'paragraph', 'qed', 'text', 'paragraph', 'section']);
+    expect(leaves).toEqual([
+      'text',
+      'text',
+      'bold',
+      'text',
+      'paragraph',
+      'qed',
+      'text',
+      'paragraph',
+      'section',
+    ]);
   });
 
   it('skip and stop', () => {
@@ -94,31 +104,57 @@ describe('walk', () => {
     expect(index.byType.get('paragraph')).toHaveLength(6);
     const proof = thm.children![1]!;
     expect(index.parentOf(proof)).toBe(thm);
-    expect(index.ancestorsOf(proof).map((a) => a.type)).toEqual(['root', 'theorem']);
+    expect(index.ancestorsOf(proof).map((a) => a.type)).toEqual([
+      'root',
+      'theorem',
+    ]);
   });
 });
 
 describe('JSON', () => {
   it('round-trips a compiled document (idempotent, compact)', async () => {
     const result = await compile(article, { documentId: 'article' });
-    const json = toJSON({ root: result.root, documentId: 'article', refs: result.refs, derived: result.derived });
+    const json = toJSON({
+      root: result.root,
+      documentId: 'article',
+      refs: result.refs,
+      derived: result.derived,
+    });
     expect(json.v).toBe(2);
-    expect(json.refs).toEqual({ intro: 'intro', pythagoras: 'pythagoras', _why: 'why', diagram: 'diagram' });
+    expect(json.refs).toEqual({
+      intro: 'intro',
+      pythagoras: 'pythagoras',
+      _why: 'why',
+      diagram: 'diagram',
+    });
     const text = JSON.stringify(json);
     expect(text).not.toContain('"pos"');
     expect(text).not.toContain('diagnostics');
     expect(text).not.toContain('"props":{}');
 
-    const back = fromJSON(json, { prose: createProse({ tags: [...allTags, Link] }) });
+    const back = fromJSON(json, {
+      prose: createProse({ tags: [...allTags, Link] }),
+    });
     expect(back.diagnostics).toEqual([]);
     expect(back.documentId).toBe('article');
-    expect(toJSON({ root: back.root, documentId: 'article', refs: result.refs, derived: back.derived })).toEqual(json);
+    expect(
+      toJSON({
+        root: back.root,
+        documentId: 'article',
+        refs: result.refs,
+        derived: back.derived,
+      }),
+    ).toEqual(json);
   });
 
   it('text children are plain strings and kinds are preserved', async () => {
     const result = await compile(tree);
     const json = toJSON({ root: result.root });
-    const sec = (json.root as { c: unknown[] }).c![0] as { t: string; k: string; c: unknown[] };
+    const sec = (json.root as { c: unknown[] }).c![0] as {
+      t: string;
+      k: string;
+      c: unknown[];
+    };
     expect(sec.t).toBe('section');
     expect(sec.k).toBe('block');
     const p = sec.c[0] as { c: unknown[] };
@@ -129,10 +165,23 @@ describe('JSON', () => {
   it('unknown types and invalid props are reported when a prose instance is given', () => {
     const prose = createProse({ tags: [P, Theorem] });
     const back = fromJSON(
-      { v: 2, root: { t: 'root', k: 'block', c: [{ t: 'nope', k: 'block' }, { t: 'theorem', k: 'block', p: { title: 1 } }] } },
+      {
+        v: 2,
+        root: {
+          t: 'root',
+          k: 'block',
+          c: [
+            { t: 'nope', k: 'block' },
+            { t: 'theorem', k: 'block', p: { title: 1 } },
+          ],
+        },
+      },
       { prose },
     );
-    expect(back.diagnostics.map((d) => d.code)).toEqual(['json/unknown-type', 'props/invalid']);
+    expect(back.diagnostics.map((d) => d.code)).toEqual([
+      'json/unknown-type',
+      'props/invalid',
+    ]);
     expect(() => fromJSON({ v: 1 as 2, root: 'x' })).toThrow('version');
   });
 });

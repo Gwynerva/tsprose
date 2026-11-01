@@ -32,17 +32,34 @@ describe('Registry-driven ProseNode', () => {
     const f = (node: ProseNode) => {
       switch (node.type) {
         case 'theorem':
-          expectTypeOf(node.props).toEqualTypeOf<{ title: string; level?: number | undefined }>();
-          expectTypeOf(node.children[0]!.type).toEqualTypeOf<'paragraph' | 'proof' | 'qed'>();
+          expectTypeOf(node.props).toEqualTypeOf<{
+            title: string;
+            level?: number | undefined;
+          }>();
+          expectTypeOf(node.children[0]!.type).toEqualTypeOf<
+            'paragraph' | 'proof' | 'qed'
+          >();
           return;
         case 'paragraph':
           expectTypeOf(node.ref).toEqualTypeOf<string | undefined>();
-          expectTypeOf(node.children[0]!.type).toEqualTypeOf<'text' | 'bold' | 'italic' | 'math' | 'em'>();
+          expectTypeOf(node.children[0]!.type).toEqualTypeOf<
+            'text' | 'bold' | 'italic' | 'math' | 'em'
+          >();
           return;
         case 'section':
           // kind-based children resolve to the registered block union
           expectTypeOf(node.children[0]!.type).toEqualTypeOf<
-            'paragraph' | 'qed' | 'image' | 'proof' | 'theorem' | 'heading' | 'section' | 'item' | 'table' | 'tr' | 'td'
+            | 'paragraph'
+            | 'qed'
+            | 'image'
+            | 'proof'
+            | 'theorem'
+            | 'heading'
+            | 'section'
+            | 'item'
+            | 'table'
+            | 'tr'
+            | 'td'
           >();
           expectTypeOf(node.data).toEqualTypeOf<{ count: number }>();
           return;
@@ -70,7 +87,11 @@ describe('Registry-driven ProseNode', () => {
   });
 
   it('exhaustive renderer maps are enforced with satisfies', () => {
-    type Renderers = { [K in ElementNode['type']]: (node: Extract<ElementNode, { type: K }>) => string };
+    type Renderers = {
+      [K in ElementNode['type']]: (
+        node: Extract<ElementNode, { type: K }>,
+      ) => string;
+    };
     const full = {
       bold: () => '',
       italic: () => '',
@@ -95,10 +116,27 @@ describe('Registry-driven ProseNode', () => {
   });
 
   it('Registered<T> resolves kind children of one tag', () => {
-    expectTypeOf<Registered<typeof Sec>['children'][number]['type']>().toEqualTypeOf<
-      'paragraph' | 'qed' | 'image' | 'proof' | 'theorem' | 'heading' | 'section' | 'item' | 'table' | 'tr' | 'td'
+    expectTypeOf<
+      Registered<typeof Sec>['children'][number]['type']
+    >().toEqualTypeOf<
+      | 'paragraph'
+      | 'qed'
+      | 'image'
+      | 'proof'
+      | 'theorem'
+      | 'heading'
+      | 'section'
+      | 'item'
+      | 'table'
+      | 'tr'
+      | 'td'
     >();
-    expectTypeOf<Registered<typeof P>['children'][number]['type']>().toEqualTypeOf<'text' | 'bold' | 'italic' | 'math' | 'em'>();
-    expectTypeOf<Registered<typeof Theorem>['props']>().toEqualTypeOf<{ title: string; level?: number | undefined }>();
+    expectTypeOf<
+      Registered<typeof P>['children'][number]['type']
+    >().toEqualTypeOf<'text' | 'bold' | 'italic' | 'math' | 'em'>();
+    expectTypeOf<Registered<typeof Theorem>['props']>().toEqualTypeOf<{
+      title: string;
+      level?: number | undefined;
+    }>();
   });
 });

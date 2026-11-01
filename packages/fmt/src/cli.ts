@@ -37,7 +37,8 @@ function parseArgs(argv: readonly string[]): Args {
   const overrides: { printWidth?: number; transform?: boolean } = {};
   const value = (i: number, flag: string): string => {
     const v = argv[i];
-    if (v === undefined || v.startsWith('--')) throw new UsageError(`${flag} needs a value`);
+    if (v === undefined || v.startsWith('--'))
+      throw new UsageError(`${flag} needs a value`);
     return v;
   };
   for (let i = 0; i < argv.length; i++) {
@@ -48,7 +49,10 @@ function parseArgs(argv: readonly string[]): Args {
     else if (arg === '--config') config = value(++i, arg);
     else if (arg === '--width') {
       const width = Number(value(++i, arg));
-      if (!Number.isInteger(width) || width <= 0) throw new UsageError(`--width must be a positive integer, got "${argv[i]}"`);
+      if (!Number.isInteger(width) || width <= 0)
+        throw new UsageError(
+          `--width must be a positive integer, got "${argv[i]}"`,
+        );
       overrides.printWidth = width;
     } else if (arg === '--no-transform') overrides.transform = false;
     else if (arg === '--help' || arg === '-h') help = true;
@@ -87,10 +91,13 @@ export async function main(argv: string[]): Promise<number> {
   if (args.config) {
     try {
       const loaded = await loadFmtConfig(args.config);
-      for (const warning of loaded.warnings) console.error(`warning: ${warning}`);
+      for (const warning of loaded.warnings)
+        console.error(`warning: ${warning}`);
       options = loaded.options;
     } catch (error) {
-      console.error(`tsprose-fmt: cannot load config ${args.config}: ${(error as Error).message}`);
+      console.error(
+        `tsprose-fmt: cannot load config ${args.config}: ${(error as Error).message}`,
+      );
       return 2;
     }
   }
@@ -109,7 +116,8 @@ export async function main(argv: string[]): Promise<number> {
 
   const missing = await missingPaths(args.paths);
   if (missing.length) {
-    for (const path of missing) console.error(`tsprose-fmt: no such file or directory: ${path}`);
+    for (const path of missing)
+      console.error(`tsprose-fmt: no such file or directory: ${path}`);
     return 2;
   }
   let changed = 0;

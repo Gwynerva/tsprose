@@ -1,11 +1,23 @@
 // Fixture tags shared by runtime and type tests. No test cases live here.
-import { defineBlock, defineInline, isTextNode, s, type BlockDef, type InlineDef, type Tag } from 'tsprose';
+import {
+  defineBlock,
+  defineInline,
+  isTextNode,
+  s,
+  type BlockDef,
+  type InlineDef,
+  type Tag,
+} from 'tsprose';
 
 //
 // Inline
 //
 
-export const B = defineInline({ name: 'bold', children: 'inline', props: { accent: s.optional(s.boolean()) } });
+export const B = defineInline({
+  name: 'bold',
+  children: 'inline',
+  props: { accent: s.optional(s.boolean()) },
+});
 export const I = defineInline({ name: 'italic', children: 'inline' });
 export const Br = defineInline({ name: 'br' });
 
@@ -14,7 +26,9 @@ export const M = defineInline({
   children: { of: 'inline', max: 1 },
   props: { currentColor: s.optional(s.boolean()) },
   ref: 'optional',
-  data: ({ children }) => ({ tex: children.map((c) => (isTextNode(c) ? c.text : '')).join('') }),
+  data: ({ children }) => ({
+    tex: children.map((c) => (isTextNode(c) ? c.text : '')).join(''),
+  }),
 });
 
 //
@@ -46,7 +60,10 @@ export const Theorem = defineBlock({
   props: { title: s.string(), level: s.optional(s.number()) },
   children: { of: [P, Proof, Qed], pattern: 'paragraph+ proof? qed?' },
   ref: 'required',
-  data: ({ props, children }) => ({ slug: props.title.toLowerCase(), count: children.length }),
+  data: ({ props, children }) => ({
+    slug: props.title.toLowerCase(),
+    count: children.length,
+  }),
 }).key((node) => node.props.title);
 
 export const Heading = defineBlock({
@@ -54,7 +71,9 @@ export const Heading = defineBlock({
   props: { level: s.enum([1, 2, 3]) },
   children: 'inline',
   ref: 'optional',
-}).key((node) => node.children.map((c) => (isTextNode(c) ? c.text : '')).join(''));
+}).key((node) =>
+  node.children.map((c) => (isTextNode(c) ? c.text : '')).join(''),
+);
 export const H1 = Heading.with({ level: 1 });
 export const H2 = Heading.with({ level: 2 });
 
@@ -77,7 +96,13 @@ export const Details = defineBlock({
 // Recursive and mutually recursive (explicit interface form)
 //
 
-export interface ItemDef extends BlockDef<'item', {}, () => readonly (Tag<ItemDef> | typeof P)[], 'optional', number> {}
+export interface ItemDef extends BlockDef<
+  'item',
+  {},
+  () => readonly (Tag<ItemDef> | typeof P)[],
+  'optional',
+  number
+> {}
 export const Item: Tag<ItemDef> = defineBlock<ItemDef>({
   name: 'item',
   ref: 'optional',
@@ -85,13 +110,57 @@ export const Item: Tag<ItemDef> = defineBlock<ItemDef>({
   data: ({ children }) => children.length,
 });
 
-export interface TrDef extends BlockDef<'tr', {}, () => readonly Tag<TdDef>[]> {}
-export interface TdDef extends BlockDef<'td', { center: ReturnType<typeof s.optional<boolean>> }, 'any'> {}
-export const Tr: Tag<TrDef> = defineBlock<TrDef>({ name: 'tr', children: () => [Td] });
-export const Td: Tag<TdDef> = defineBlock<TdDef>({ name: 'td', props: { center: s.optional(s.boolean()) }, children: 'any' });
-export const Table = defineBlock({ name: 'table', children: () => [Tr], ref: 'optional' });
+export interface TrDef extends BlockDef<
+  'tr',
+  {},
+  () => readonly Tag<TdDef>[]
+> {}
+export interface TdDef extends BlockDef<
+  'td',
+  { center: ReturnType<typeof s.optional<boolean>> },
+  'any'
+> {}
+export const Tr: Tag<TrDef> = defineBlock<TrDef>({
+  name: 'tr',
+  children: () => [Td],
+});
+export const Td: Tag<TdDef> = defineBlock<TdDef>({
+  name: 'td',
+  props: { center: s.optional(s.boolean()) },
+  children: 'any',
+});
+export const Table = defineBlock({
+  name: 'table',
+  children: () => [Tr],
+  ref: 'optional',
+});
 
-export interface EmDef extends InlineDef<'em', {}, () => readonly (Tag<EmDef> | typeof B)[]> {}
-export const Em: Tag<EmDef> = defineInline<EmDef>({ name: 'em', children: () => [Em, B] });
+export interface EmDef extends InlineDef<
+  'em',
+  {},
+  () => readonly (Tag<EmDef> | typeof B)[]
+> {}
+export const Em: Tag<EmDef> = defineInline<EmDef>({
+  name: 'em',
+  children: () => [Em, B],
+});
 
-export const allTags = [B, I, Br, M, P, Qed, Image, Proof, Theorem, Heading, Sec, Details, Item, Tr, Td, Table, Em] as const;
+export const allTags = [
+  B,
+  I,
+  Br,
+  M,
+  P,
+  Qed,
+  Image,
+  Proof,
+  Theorem,
+  Heading,
+  Sec,
+  Details,
+  Item,
+  Tr,
+  Td,
+  Table,
+  Em,
+] as const;

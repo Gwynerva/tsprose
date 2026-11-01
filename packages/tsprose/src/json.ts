@@ -14,7 +14,13 @@ export interface JsonNodeSlot {
 }
 
 export function isJsonNodeSlot(value: unknown): value is JsonNodeSlot {
-  return typeof value === 'object' && value !== null && !Array.isArray(value) && '$node' in value && Object.keys(value).length === 1;
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    '$node' in value &&
+    Object.keys(value).length === 1
+  );
 }
 
 /**
@@ -27,7 +33,8 @@ function jsonValue(value: unknown, node: (node: AnyNode) => unknown): unknown {
   if (Array.isArray(value)) return value.map((v) => jsonValue(v, node));
   if (value && typeof value === 'object') {
     const out: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(value as Record<string, unknown>)) if (v !== undefined) out[k] = jsonValue(v, node);
+    for (const [k, v] of Object.entries(value as Record<string, unknown>))
+      if (v !== undefined) out[k] = jsonValue(v, node);
     return out;
   }
   return value;
@@ -45,9 +52,13 @@ function sanitize(value: unknown): unknown {
  * Content hash of a node: type, props and data (references and nested nodes in their JSON form) and the hashes of
  * its children — never ids, refs, meta or positions. Compiled nodes and nodes restored with `fromJSON` hash alike.
  */
-export function contentHash(node: AnyNode, childHashes?: readonly string[]): string {
+export function contentHash(
+  node: AnyNode,
+  childHashes?: readonly string[],
+): string {
   if (isTextNode(node)) return hashText(`text:${node.text}`);
-  const content = (n: AnyNode): unknown => (isTextNode(n) ? n.text : { t: n.type, h: contentHash(n) });
+  const content = (n: AnyNode): unknown =>
+    isTextNode(n) ? n.text : { t: n.type, h: contentHash(n) };
   return hashText(
     canonicalJson({
       t: node.type,
@@ -59,7 +70,10 @@ export function contentHash(node: AnyNode, childHashes?: readonly string[]): str
 }
 
 /** Derive key of a node: `type:contentHash`. Shared by `compile` and `deriveJSON`, so their caches agree. */
-export function deriveKey(node: BaseNode, hash: string = contentHash(node)): string {
+export function deriveKey(
+  node: BaseNode,
+  hash: string = contentHash(node),
+): string {
   return `${node.type}:${hash}`;
 }
 
@@ -86,7 +100,12 @@ export interface ProseJSON {
 }
 
 function isEmptyObject(value: unknown): boolean {
-  return typeof value === 'object' && value !== null && !Array.isArray(value) && Object.keys(value).length === 0;
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    Object.keys(value).length === 0
+  );
 }
 
 /** Serialize one node (and its subtree): text as strings, references as `{ $ref }`, nested nodes as `{ $node }`. */
@@ -103,13 +122,16 @@ export function nodeToJSON(node: AnyNode): JsonNode {
     dk?: string;
     c?: JsonNode[];
   } = { t: node.type, k: node.kind };
-  if (!isEmptyObject(node.props)) out.p = sanitize(node.props) as Record<string, unknown>;
+  if (!isEmptyObject(node.props))
+    out.p = sanitize(node.props) as Record<string, unknown>;
   if (node.data !== undefined) out.d = sanitize(node.data);
-  if (!isEmptyObject(node.meta)) out.m = sanitize(node.meta) as Record<string, unknown>;
+  if (!isEmptyObject(node.meta))
+    out.m = sanitize(node.meta) as Record<string, unknown>;
   if (node.ref !== undefined) out.r = node.ref;
   if (node.id !== undefined) out.id = node.id;
   if (node.derived !== undefined) out.dk = node.derived;
-  if (node.children && node.children.length) out.c = node.children.map(nodeToJSON);
+  if (node.children && node.children.length)
+    out.c = node.children.map(nodeToJSON);
   return out;
 }
 
@@ -122,7 +144,11 @@ export interface ToJSONInput {
 
 /** Serialize a compiled tree. Positions, diagnostics and definitions are not included. */
 export function toJSON(input: ToJSONInput): ProseJSON {
-  const refs = input.refs ? Object.fromEntries([...input.refs].map(([name, node]) => [name, node.id ?? ''])) : undefined;
+  const refs = input.refs
+    ? Object.fromEntries(
+        [...input.refs].map(([name, node]) => [name, node.id ?? '']),
+      )
+    : undefined;
   const derived = input.derived ? Object.fromEntries(input.derived) : undefined;
   return {
     v: 2,
@@ -149,26 +175,41 @@ export interface FromJSONResult {
 }
 
 /** Turn `{ $node }` slots (nodes stored in props/data) back into nodes. */
-function restoreSlots(value: unknown, options: FromJSONOptions, bag: DiagnosticBag): unknown {
+function restoreSlots(
+  value: unknown,
+  options: FromJSONOptions,
+  bag: DiagnosticBag,
+): unknown {
   if (isJsonNodeSlot(value)) return nodeFromJSON(value.$node, options, bag);
-  if (Array.isArray(value)) return value.map((v) => restoreSlots(v, options, bag));
+  if (Array.isArray(value))
+    return value.map((v) => restoreSlots(v, options, bag));
   if (value && typeof value === 'object') {
     const out: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(value as Record<string, unknown>)) out[k] = restoreSlots(v, options, bag);
+    for (const [k, v] of Object.entries(value as Record<string, unknown>))
+      out[k] = restoreSlots(v, options, bag);
     return out;
   }
   return value;
 }
 
 /** Restore one node from JSON; with `options.prose` definitions are re-attached and props re-validated. */
-export function nodeFromJSON(json: JsonNode, options: FromJSONOptions = {}, bag = new DiagnosticBag()): AnyNode {
-  if (typeof json === 'string') return { type: 'text', kind: 'inline', text: json };
+export function nodeFromJSON(
+  json: JsonNode,
+  options: FromJSONOptions = {},
+  bag = new DiagnosticBag(),
+): AnyNode {
+  if (typeof json === 'string')
+    return { type: 'text', kind: 'inline', text: json };
   const node: BaseNode = {
     type: json.t,
     kind: json.k,
-    props: json.p ? (restoreSlots(json.p, options, bag) as Record<string, unknown>) : {},
+    props: json.p
+      ? (restoreSlots(json.p, options, bag) as Record<string, unknown>)
+      : {},
     data: restoreSlots(json.d, options, bag),
-    children: json.c ? json.c.map((c) => nodeFromJSON(c, options, bag)) : undefined,
+    children: json.c
+      ? json.c.map((c) => nodeFromJSON(c, options, bag))
+      : undefined,
     ref: json.r,
     meta: json.m ? { ...json.m } : {},
     id: json.id,
@@ -178,7 +219,8 @@ export function nodeFromJSON(json: JsonNode, options: FromJSONOptions = {}, bag 
   if (tag) {
     attachDef(node, tag.def);
     const { issues } = validateProps(tag.def.props, node.props);
-    for (const issue of issues) bag.error('props/invalid', `<${json.t}> ${issue.message}`);
+    for (const issue of issues)
+      bag.error('props/invalid', `<${json.t}> ${issue.message}`);
   } else if (options.prose && json.t !== 'root' && json.t !== 'fragment') {
     bag.error('json/unknown-type', `Unknown node type "${json.t}"`);
   }
@@ -186,8 +228,14 @@ export function nodeFromJSON(json: JsonNode, options: FromJSONOptions = {}, bag 
 }
 
 /** Restore a serialized document (`toJSON` output): tree, ref → id map and derived values. */
-export function fromJSON(json: ProseJSON, options: FromJSONOptions = {}): FromJSONResult {
-  if (json.v !== 2) throw new TypeError(`Unsupported prose JSON version ${String((json as { v: unknown }).v)}`);
+export function fromJSON(
+  json: ProseJSON,
+  options: FromJSONOptions = {},
+): FromJSONResult {
+  if (json.v !== 2)
+    throw new TypeError(
+      `Unsupported prose JSON version ${String((json as { v: unknown }).v)}`,
+    );
   const bag = new DiagnosticBag();
   const root = nodeFromJSON(json.root, options, bag) as BaseNode;
   if (options.strict && !bag.empty) {

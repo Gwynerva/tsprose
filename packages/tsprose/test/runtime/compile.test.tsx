@@ -14,7 +14,15 @@ import {
   type BaseNode,
 } from 'tsprose';
 import { kit } from '../fixtures/kit.js';
-import { Link, article, articleRefs, broken, cycleA, cycleB, summary } from '../fixtures/documents.js';
+import {
+  Link,
+  article,
+  articleRefs,
+  broken,
+  cycleA,
+  cycleB,
+  summary,
+} from '../fixtures/documents.js';
 import { Image, P, Theorem } from '../fixtures/tags.js';
 
 const codes = (ds: readonly { code: string }[]) => ds.map((d) => d.code);
@@ -57,8 +65,16 @@ describe('compile: ids and hashes', () => {
   });
 
   it('inserting content before an element does not change hashed ids of unrelated elements', async () => {
-    const before = await compile(defineDocument(() => [P({ children: 'alpha' }), P({ children: 'beta' })]));
-    const after = await compile(defineDocument(() => [P({ children: 'new' }), P({ children: 'alpha' }), P({ children: 'beta' })]));
+    const before = await compile(
+      defineDocument(() => [P({ children: 'alpha' }), P({ children: 'beta' })]),
+    );
+    const after = await compile(
+      defineDocument(() => [
+        P({ children: 'new' }),
+        P({ children: 'alpha' }),
+        P({ children: 'beta' }),
+      ]),
+    );
     const idsBefore = [...before.ids.keys()];
     const idsAfter = [...after.ids.keys()];
     expect(idsAfter.slice(1)).toEqual(idsBefore);
@@ -69,7 +85,14 @@ describe('compile: refs', () => {
   it('reports unused, foreign and duplicate refs plus invalid props, all at once with positions', async () => {
     const result = await compile(broken, { documentId: 'broken' });
     expect(codes(result.diagnostics).sort()).toEqual(
-      ['children/pattern', 'document/loose-inline', 'props/invalid', 'ref/duplicate', 'ref/foreign', 'ref/unused'].sort(),
+      [
+        'children/pattern',
+        'document/loose-inline',
+        'props/invalid',
+        'ref/duplicate',
+        'ref/foreign',
+        'ref/unused',
+      ].sort(),
     );
     const withPos = result.diagnostics.filter((d) => d.pos);
     expect(withPos.length).toBeGreaterThanOrEqual(3);
@@ -81,8 +104,12 @@ describe('compile: refs', () => {
   });
 
   it('strict mode throws an aggregated error', async () => {
-    await expect(compile(broken, { strict: true })).rejects.toBeInstanceOf(TSProseError);
-    await expect(compile(broken, { strict: true })).rejects.toThrow(/ref\/unused/);
+    await expect(compile(broken, { strict: true })).rejects.toBeInstanceOf(
+      TSProseError,
+    );
+    await expect(compile(broken, { strict: true })).rejects.toThrow(
+      /ref\/unused/,
+    );
   });
 
   it('string refs become ids and refs entries', async () => {
@@ -104,7 +131,9 @@ describe('compile: corpus, links and includes', () => {
     const corpus = makeCorpus();
     const result = await compile(summary, { corpus, documentId: 'summary' });
     expect(result.diagnostics).toEqual([]);
-    expect(result.outgoing.map((o) => ({ prop: o.prop, target: o.target }))).toEqual([
+    expect(
+      result.outgoing.map((o) => ({ prop: o.prop, target: o.target })),
+    ).toEqual([
       { prop: 'to', target: { documentId: 'article', name: 'intro' } },
       { prop: 'of', target: { documentId: 'article', name: 'pythagoras' } },
       // the link inside the transcluded theorem counts as an outgoing reference of the summary too
@@ -115,32 +144,54 @@ describe('compile: corpus, links and includes', () => {
   it('unresolved links are errors with a corpus and warnings without', async () => {
     // fresh refs never bound to any corpus
     const targetRefs = defineRefs({ t: P });
-    const user = defineDocument(() => [<Link to={targetRefs.t}>x</Link>, <Include of={targetRefs.t} />]);
+    const user = defineDocument(() => [
+      <Link to={targetRefs.t}>x</Link>,
+      <Include of={targetRefs.t} />,
+    ]);
     const lonely = new Corpus().add('user', user);
     const withCorpus = await compile(user, { corpus: lonely, kit: kit.kit });
-    expect(codes(withCorpus.diagnostics)).toEqual(['include/unresolved', 'ref/unresolved']);
-    expect(withCorpus.diagnostics.every((d) => d.severity === 'error')).toBe(true);
+    expect(codes(withCorpus.diagnostics)).toEqual([
+      'include/unresolved',
+      'ref/unresolved',
+    ]);
+    expect(withCorpus.diagnostics.every((d) => d.severity === 'error')).toBe(
+      true,
+    );
 
     const noCorpus = await compile(user, { kit: kit.kit });
-    expect(codes(noCorpus.diagnostics)).toEqual(['include/unresolved', 'ref/unresolved']);
-    expect(noCorpus.diagnostics.find((d) => d.code === 'ref/unresolved')!.severity).toBe('warning');
+    expect(codes(noCorpus.diagnostics)).toEqual([
+      'include/unresolved',
+      'ref/unresolved',
+    ]);
+    expect(
+      noCorpus.diagnostics.find((d) => d.code === 'ref/unresolved')!.severity,
+    ).toBe('warning');
   });
 
   it('ref handles in props serialize as resolved targets', async () => {
     const corpus = makeCorpus();
     const result = await compile(summary, { corpus, documentId: 'summary' });
     const json = JSON.stringify(toJSON({ root: result.root }));
-    expect(json).toContain('"to":{"$ref":{"documentId":"article","name":"intro"}}');
+    expect(json).toContain(
+      '"to":{"$ref":{"documentId":"article","name":"intro"}}',
+    );
     expect(json).not.toContain('scope');
   });
 
   it('includes a compiled copy without mutating the source and without ids/refs', async () => {
     const corpus = makeCorpus();
-    const result = await compile(summary, { corpus, documentId: 'summary', kit: kit.kit });
+    const result = await compile(summary, {
+      corpus,
+      documentId: 'summary',
+      kit: kit.kit,
+    });
     const included = result.root.children![2] as BaseNode;
     expect(included.type).toBe('theorem');
     expect(included.ref).toBeUndefined();
-    expect(included.meta.includedFrom).toEqual({ documentId: 'article', name: 'pythagoras' });
+    expect(included.meta.includedFrom).toEqual({
+      documentId: 'article',
+      name: 'pythagoras',
+    });
     expect(included.meta.toc).toBe('Theorem'); // extra meta passed through <Include meta>
     expect(included.id).toMatch(/^pythagorean-theorem$/);
     expect(included.data).toEqual({ slug: 'pythagorean theorem', count: 2 });
@@ -153,7 +204,9 @@ describe('compile: corpus, links and includes', () => {
     expect(nested.every((n) => n.ref === undefined)).toBe(true);
     // ref handles inside the transcluded copy survive cloning and serialize as targets
     const json = JSON.stringify(toJSON({ root: result.root }));
-    expect(json).toContain('"to":{"$ref":{"documentId":"article","name":"intro"}}');
+    expect(json).toContain(
+      '"to":{"$ref":{"documentId":"article","name":"intro"}}',
+    );
     expect(json).not.toContain('"scope"');
   });
 
@@ -162,8 +215,16 @@ describe('compile: corpus, links and includes', () => {
     const { results, index, diagnostics } = await compileCorpus(corpus);
     expect(diagnostics).toEqual([]);
     expect([...results.keys()]).toEqual(['article', 'summary']);
-    expect(index.incoming({ documentId: 'article', name: 'intro' }).map((e) => e.source)).toEqual(['link', 'link', 'link']); // article, summary, and the copy included into summary
-    expect(index.incoming({ documentId: 'article', name: 'pythagoras' }).map((e) => e.kind)).toEqual(['include']);
+    expect(
+      index
+        .incoming({ documentId: 'article', name: 'intro' })
+        .map((e) => e.source),
+    ).toEqual(['link', 'link', 'link']); // article, summary, and the copy included into summary
+    expect(
+      index
+        .incoming({ documentId: 'article', name: 'pythagoras' })
+        .map((e) => e.kind),
+    ).toEqual(['include']);
   });
 
   it('include cycles and self includes are diagnostics, not hangs', async () => {
@@ -176,7 +237,10 @@ describe('compile: corpus, links and includes', () => {
   it('corpus binds ref scopes to document ids', () => {
     const corpus = makeCorpus();
     expect(articleRefs.intro.scope.documentId).toBe('article');
-    expect(corpus.resolve(articleRefs.intro)).toEqual({ documentId: 'article', name: 'intro' });
+    expect(corpus.resolve(articleRefs.intro)).toEqual({
+      documentId: 'article',
+      name: 'intro',
+    });
     expect(corpus.idOfUrl('file:///corpus/article/refs.ts')).toBe('article');
     expect(() => corpus.add('article2', article)).toThrow(/already bound/);
   });
@@ -188,7 +252,8 @@ describe('compile: hooks, numbering, derive', () => {
     const toc = defineHook({
       name: 'toc',
       enter(node) {
-        if (!isTextNode(node) && node.type === 'heading') seen.push(String(node.id));
+        if (!isTextNode(node) && node.type === 'heading')
+          seen.push(String(node.id));
       },
       finish: () => seen,
     });
@@ -208,7 +273,9 @@ describe('compile: hooks, numbering, derive', () => {
   });
 
   it('numbering assigns meta.number per counter', async () => {
-    const result = await compile(article, { numbering: { theorem: 'statement', paragraph: 'par' } });
+    const result = await compile(article, {
+      numbering: { theorem: 'statement', paragraph: 'par' },
+    });
     expect(result.counters.get('statement')).toBe(1);
     expect(result.counters.get('par')).toBe(6);
     expect(result.refs.get('pythagoras')!.meta.number).toBe(1);
@@ -248,7 +315,10 @@ describe('compile: hooks, numbering, derive', () => {
         },
       },
     });
-    expect(codes(result.diagnostics)).toEqual(['derive/failed', 'derive/failed']);
+    expect(codes(result.diagnostics)).toEqual([
+      'derive/failed',
+      'derive/failed',
+    ]);
     expect([...result.derived.values()]).toEqual([null, null]);
   });
 

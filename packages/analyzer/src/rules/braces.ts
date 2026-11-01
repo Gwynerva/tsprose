@@ -1,4 +1,9 @@
-import { elementName, forEachJsxContainer, rangeOf, type EsNode } from '../estree.js';
+import {
+  elementName,
+  forEachJsxContainer,
+  rangeOf,
+  type EsNode,
+} from '../estree.js';
 import type { Finding, Manifest } from '../types.js';
 
 /** Text ending in a LaTeX command or a sub/superscript marker: `\sqrt`, `\frac`, `x^`, `a_`. */
@@ -10,12 +15,17 @@ const TEX_TAIL = /(?:\\[A-Za-z]+|[_^])$/;
  * Fix: write math in a template (`{m`\sqrt{20}`}`, `` <M>{String.raw`…`}</M> ``) or an attribute.
  * With `manifest.mathTags`, only the children of those tags are checked.
  */
-export function checkBraces(program: EsNode, source: string, manifest?: Manifest): Finding[] {
+export function checkBraces(
+  program: EsNode,
+  source: string,
+  manifest?: Manifest,
+): Finding[] {
   const findings: Finding[] = [];
   const mathTags = manifest?.mathTags ? new Set(manifest.mathTags) : undefined;
   forEachJsxContainer(program, (container) => {
     if (mathTags) {
-      const name = container.type === 'JSXElement' ? elementName(container) : undefined;
+      const name =
+        container.type === 'JSXElement' ? elementName(container) : undefined;
       if (name === undefined || !mathTags.has(name)) return;
     }
     const children = (container.children as EsNode[]) ?? [];

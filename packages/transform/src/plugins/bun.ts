@@ -8,7 +8,9 @@ export interface TSProseBunPlugin {
   setup(build: {
     onLoad(
       constraints: { filter: RegExp },
-      callback: (args: { path: string }) => Promise<{ contents: string; loader: 'tsx' | 'jsx' } | undefined>,
+      callback: (args: {
+        path: string;
+      }) => Promise<{ contents: string; loader: 'tsx' | 'jsx' } | undefined>,
     ): unknown;
   }): void;
 }
@@ -27,7 +29,10 @@ export function tsproseBun(options: PluginOptions = {}): TSProseBunPlugin {
         const result = transform(source, args.path, options);
         // Parse errors: hand Bun the original source so it reports them itself.
         if (result.errors.length || result.code === source) return undefined;
-        return { contents: result.code, loader: args.path.endsWith('.jsx') ? 'jsx' : 'tsx' };
+        return {
+          contents: result.code,
+          loader: args.path.endsWith('.jsx') ? 'jsx' : 'tsx',
+        };
       });
     },
   };

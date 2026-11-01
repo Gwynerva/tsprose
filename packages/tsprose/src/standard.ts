@@ -13,7 +13,9 @@ export declare namespace StandardSchemaV1 {
   export interface Props<Input = unknown, Output = Input> {
     readonly version: 1;
     readonly vendor: string;
-    readonly validate: (value: unknown) => Result<Output> | Promise<Result<Output>>;
+    readonly validate: (
+      value: unknown,
+    ) => Result<Output> | Promise<Result<Output>>;
     readonly types?: Types<Input, Output> | undefined;
   }
   export type Result<Output> = SuccessResult<Output> | FailureResult;
@@ -44,7 +46,9 @@ export declare namespace StandardSchemaV1 {
 }
 
 /** Output type of a Standard Schema value (or `never` when it is not one). */
-export type InferOutput<S> = S extends { readonly '~standard': { readonly types?: infer T } }
+export type InferOutput<S> = S extends {
+  readonly '~standard': { readonly types?: infer T };
+}
   ? T extends { readonly output: infer O }
     ? O
     : never
@@ -63,12 +67,16 @@ type Simplify<T> = { [K in keyof T]: T[K] } & {};
 export type PropsInput = PropsSpec | StandardSchemaV1<any, any>;
 
 /** True when `props` is one schema for the whole object (has the Standard Schema `~standard` marker). */
-export function isObjectSchema(props: PropsInput | undefined): props is StandardSchemaV1 {
+export function isObjectSchema(
+  props: PropsInput | undefined,
+): props is StandardSchemaV1 {
   return typeof props === 'object' && props !== null && '~standard' in props;
 }
 
 /** Props object type of a {@link PropsInput}. */
-export type PropsOf<P> = P extends { readonly '~standard': { readonly types?: infer T } }
+export type PropsOf<P> = P extends {
+  readonly '~standard': { readonly types?: infer T };
+}
   ? T extends { readonly output: infer O }
     ? O
     : Record<string, unknown>
@@ -77,12 +85,16 @@ export type PropsOf<P> = P extends { readonly '~standard': { readonly types?: in
     : never;
 
 /** Distributes over unions (plain `Omit` collapses a union of prop sets into their common keys). */
-export type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
+export type DistributiveOmit<T, K extends PropertyKey> = T extends unknown
+  ? Omit<T, K>
+  : never;
 
 type UnionKeys<T> = T extends unknown ? keyof T : never;
 
 /** Exactly one member of `U`: keys of the other members are `?: never` there (like `ts-xor`). */
-export type ExclusiveOf<U, All = U> = U extends unknown ? U & { [K in Exclude<UnionKeys<All>, keyof U>]?: never } : never;
+export type ExclusiveOf<U, All = U> = U extends unknown
+  ? U & { [K in Exclude<UnionKeys<All>, keyof U>]?: never }
+  : never;
 
 /** Prop names known for a {@link PropsInput} (record keys, or `keys` exposed by an object-like schema). */
 export function propKeys(props: PropsInput): readonly string[] {
@@ -97,8 +109,14 @@ export function propKeys(props: PropsInput): readonly string[] {
  * properties survives into the props type and shows on hover in JSX.
  */
 export type InferProps<P extends PropsSpec> = Simplify<
-  { -readonly [K in keyof P as undefined extends InferOutput<P[K]> ? never : K]: InferOutput<P[K]> } & {
-    -readonly [K in keyof P as undefined extends InferOutput<P[K]> ? K : never]?: InferOutput<P[K]>;
+  {
+    -readonly [
+      K in keyof P as undefined extends InferOutput<P[K]> ? never : K
+    ]: InferOutput<P[K]>;
+  } & {
+    -readonly [
+      K in keyof P as undefined extends InferOutput<P[K]> ? K : never
+    ]?: InferOutput<P[K]>;
   }
 >;
 
@@ -132,22 +150,34 @@ const REF_PROPS = Symbol.for('tsprose.refProps');
 
 /** Reference metadata of a schema that accepts references (`refSchema`, or a wrapper/union around one). */
 export function refMetaOf(schema: unknown): RefMeta | undefined {
-  return schema && typeof schema === 'object' ? (schema as Record<symbol, RefMeta | undefined>)[REF_META] : undefined;
+  return schema && typeof schema === 'object'
+    ? (schema as Record<symbol, RefMeta | undefined>)[REF_META]
+    : undefined;
 }
 
 /** Per-key reference metadata of an object-like schema (`s.object`, `s.exclusive`, unions of them). */
-export function refPropsOf(schema: unknown): Readonly<Record<string, RefMeta>> | undefined {
-  return schema && typeof schema === 'object' ? (schema as Record<symbol, Record<string, RefMeta> | undefined>)[REF_PROPS] : undefined;
+export function refPropsOf(
+  schema: unknown,
+): Readonly<Record<string, RefMeta>> | undefined {
+  return schema && typeof schema === 'object'
+    ? (schema as Record<symbol, Record<string, RefMeta> | undefined>)[REF_PROPS]
+    : undefined;
 }
 
 /** Attach reference metadata to a schema (non-enumerable). Used by `refSchema`; returns the same schema. */
 export function withRefMeta<S extends object>(schema: S, meta: RefMeta): S {
-  Object.defineProperty(schema, REF_META, { value: meta, enumerable: false, configurable: true });
+  Object.defineProperty(schema, REF_META, {
+    value: meta,
+    enumerable: false,
+    configurable: true,
+  });
   return schema;
 }
 
 /** Reference metadata of a whole props spec (record of schemas or one object schema), by prop name. */
-export function refPropsOfProps(props: PropsInput | undefined): Readonly<Record<string, RefMeta>> {
+export function refPropsOfProps(
+  props: PropsInput | undefined,
+): Readonly<Record<string, RefMeta>> {
   if (!props) return {};
   if (isObjectSchema(props)) return refPropsOf(props) ?? {};
   const out: Record<string, RefMeta> = {};
@@ -160,14 +190,27 @@ export function refPropsOfProps(props: PropsInput | undefined): Readonly<Record<
 
 function inherit<S extends object>(schema: S, sources: readonly unknown[]): S {
   const meta = sources.map(refMetaOf).find(Boolean);
-  if (meta) Object.defineProperty(schema, REF_META, { value: meta, enumerable: false, configurable: true });
+  if (meta)
+    Object.defineProperty(schema, REF_META, {
+      value: meta,
+      enumerable: false,
+      configurable: true,
+    });
   const props: Record<string, RefMeta> = {};
   for (const source of sources) Object.assign(props, refPropsOf(source));
-  if (Object.keys(props).length) Object.defineProperty(schema, REF_PROPS, { value: props, enumerable: false, configurable: true });
+  if (Object.keys(props).length)
+    Object.defineProperty(schema, REF_PROPS, {
+      value: props,
+      enumerable: false,
+      configurable: true,
+    });
   return schema;
 }
 
-function fail(message: string, path?: readonly PropertyKey[]): StandardSchemaV1.FailureResult {
+function fail(
+  message: string,
+  path?: readonly PropertyKey[],
+): StandardSchemaV1.FailureResult {
   return { issues: [path && path.length ? { message, path } : { message }] };
 }
 
@@ -206,7 +249,11 @@ export type Primitive = string | number | boolean | null | undefined;
 
 export const s = {
   string: (): Schema<string> =>
-    make((v) => (typeof v === 'string' ? { value: v } : fail(`Expected string, received ${describe(v)}`))),
+    make((v) =>
+      typeof v === 'string'
+        ? { value: v }
+        : fail(`Expected string, received ${describe(v)}`),
+    ),
 
   number: (): Schema<number> =>
     make((v) =>
@@ -216,83 +263,128 @@ export const s = {
     ),
 
   boolean: (): Schema<boolean> =>
-    make((v) => (typeof v === 'boolean' ? { value: v } : fail(`Expected boolean, received ${describe(v)}`))),
+    make((v) =>
+      typeof v === 'boolean'
+        ? { value: v }
+        : fail(`Expected boolean, received ${describe(v)}`),
+    ),
 
   literal: <const L extends Primitive>(literal: L): Schema<L> =>
-    make((v) => (v === literal ? { value: v as L } : fail(`Expected ${JSON.stringify(literal)}, received ${JSON.stringify(v)}`))),
+    make((v) =>
+      v === literal
+        ? { value: v as L }
+        : fail(
+            `Expected ${JSON.stringify(literal)}, received ${JSON.stringify(v)}`,
+          ),
+    ),
 
   enum: <const V extends readonly Primitive[]>(values: V): Schema<V[number]> =>
     make((v) =>
       (values as readonly unknown[]).includes(v)
         ? { value: v as V[number] }
-        : fail(`Expected one of ${values.map((x) => JSON.stringify(x)).join(', ')}, received ${JSON.stringify(v)}`),
+        : fail(
+            `Expected one of ${values.map((x) => JSON.stringify(x)).join(', ')}, received ${JSON.stringify(v)}`,
+          ),
     ),
 
   optional: <T>(inner: StandardSchemaV1<unknown, T>): Schema<T | undefined> =>
-    inherit(make<T | undefined>((v) => (v === undefined ? { value: undefined } : runSync(inner, v))), [inner]),
+    inherit(
+      make<T | undefined>((v) =>
+        v === undefined ? { value: undefined } : runSync(inner, v),
+      ),
+      [inner],
+    ),
 
   nullable: <T>(inner: StandardSchemaV1<unknown, T>): Schema<T | null> =>
-    inherit(make<T | null>((v) => (v === null ? { value: null } : runSync(inner, v))), [inner]),
+    inherit(
+      make<T | null>((v) => (v === null ? { value: null } : runSync(inner, v))),
+      [inner],
+    ),
 
   array: <T>(inner: StandardSchemaV1<unknown, T>): Schema<T[]> =>
-    inherit(make((v) => {
-      if (!Array.isArray(v)) return fail(`Expected array, received ${describe(v)}`);
-      const out: T[] = [];
-      const issues: Issue[] = [];
-      v.forEach((item, index) => {
-        const r = runSync(inner, item);
-        if (r.issues) issues.push(...prefixIssues(r.issues, index));
-        else out.push(r.value);
-      });
-      return issues.length ? { issues } : { value: out };
-    }), [inner]),
+    inherit(
+      make((v) => {
+        if (!Array.isArray(v))
+          return fail(`Expected array, received ${describe(v)}`);
+        const out: T[] = [];
+        const issues: Issue[] = [];
+        v.forEach((item, index) => {
+          const r = runSync(inner, item);
+          if (r.issues) issues.push(...prefixIssues(r.issues, index));
+          else out.push(r.value);
+        });
+        return issues.length ? { issues } : { value: out };
+      }),
+      [inner],
+    ),
 
-  object: <const Shape extends PropsSpec>(shape: Shape): Schema<InferProps<Shape>> =>
-    inherit(make((v) => {
-      if (typeof v !== 'object' || v === null || Array.isArray(v)) {
-        return fail(`Expected object, received ${describe(v)}`);
-      }
-      const input = v as Record<string, unknown>;
-      const out: Record<string, unknown> = {};
-      const issues: Issue[] = [];
-      for (const key of Object.keys(shape)) {
-        const r = runSync(shape[key]!, input[key]);
-        if (r.issues) issues.push(...prefixIssues(r.issues, key));
-        else if (r.value !== undefined || key in input) out[key] = r.value;
-      }
-      for (const key of Object.keys(input)) {
-        if (!(key in shape)) issues.push({ message: `Unknown key "${key}"`, path: [key] });
-      }
-      return issues.length ? { issues } : { value: out as InferProps<Shape> };
-    }, Object.keys(shape)), [{ [REF_PROPS]: refPropsOfProps(shape) }]),
+  object: <const Shape extends PropsSpec>(
+    shape: Shape,
+  ): Schema<InferProps<Shape>> =>
+    inherit(
+      make((v) => {
+        if (typeof v !== 'object' || v === null || Array.isArray(v)) {
+          return fail(`Expected object, received ${describe(v)}`);
+        }
+        const input = v as Record<string, unknown>;
+        const out: Record<string, unknown> = {};
+        const issues: Issue[] = [];
+        for (const key of Object.keys(shape)) {
+          const r = runSync(shape[key]!, input[key]);
+          if (r.issues) issues.push(...prefixIssues(r.issues, key));
+          else if (r.value !== undefined || key in input) out[key] = r.value;
+        }
+        for (const key of Object.keys(input)) {
+          if (!(key in shape))
+            issues.push({ message: `Unknown key "${key}"`, path: [key] });
+        }
+        return issues.length ? { issues } : { value: out as InferProps<Shape> };
+      }, Object.keys(shape)),
+      [{ [REF_PROPS]: refPropsOfProps(shape) }],
+    ),
 
   record: <T>(inner: StandardSchemaV1<unknown, T>): Schema<Record<string, T>> =>
-    inherit(make((v) => {
-      if (typeof v !== 'object' || v === null || Array.isArray(v)) {
-        return fail(`Expected object, received ${describe(v)}`);
-      }
-      const out: Record<string, T> = {};
-      const issues: Issue[] = [];
-      for (const [key, item] of Object.entries(v as Record<string, unknown>)) {
-        const r = runSync(inner, item);
-        if (r.issues) issues.push(...prefixIssues(r.issues, key));
-        else out[key] = r.value;
-      }
-      return issues.length ? { issues } : { value: out };
-    }), [inner]),
+    inherit(
+      make((v) => {
+        if (typeof v !== 'object' || v === null || Array.isArray(v)) {
+          return fail(`Expected object, received ${describe(v)}`);
+        }
+        const out: Record<string, T> = {};
+        const issues: Issue[] = [];
+        for (const [key, item] of Object.entries(
+          v as Record<string, unknown>,
+        )) {
+          const r = runSync(inner, item);
+          if (r.issues) issues.push(...prefixIssues(r.issues, key));
+          else out[key] = r.value;
+        }
+        return issues.length ? { issues } : { value: out };
+      }),
+      [inner],
+    ),
 
   union: <const Members extends readonly StandardSchemaV1[]>(
     ...members: Members
   ): Schema<InferOutput<Members[number]>> =>
-    inherit(make<InferOutput<Members[number]>>((v) => {
-      const all: Issue[] = [];
-      for (const member of members) {
-        const r = runSync(member, v);
-        if (!r.issues) return { value: r.value as InferOutput<Members[number]> };
-        all.push(...r.issues);
-      }
-      return { issues: [{ message: `No union member matched: ${all.map((i) => i.message).join(' | ')}` }] };
-    }, memberKeys(members)), members),
+    inherit(
+      make<InferOutput<Members[number]>>((v) => {
+        const all: Issue[] = [];
+        for (const member of members) {
+          const r = runSync(member, v);
+          if (!r.issues)
+            return { value: r.value as InferOutput<Members[number]> };
+          all.push(...r.issues);
+        }
+        return {
+          issues: [
+            {
+              message: `No union member matched: ${all.map((i) => i.message).join(' | ')}`,
+            },
+          ],
+        };
+      }, memberKeys(members)),
+      members,
+    ),
 
   /**
    * Exactly one of several prop sets (each usually an `s.object`): `s.exclusive(s.object({ yes: … }), s.object({ answer: … }))`.
@@ -303,43 +395,87 @@ export const s = {
     ...members: Members
   ): Schema<ExclusiveOf<InferOutput<Members[number]>>> => {
     const keys = memberKeys(members);
-    const keySets = members.map((m) => new Set((m as { keys?: readonly string[] }).keys ?? []));
-    return inherit(make<ExclusiveOf<InferOutput<Members[number]>>>((v) => {
-      const present = v && typeof v === 'object' ? Object.keys(v).filter((k) => (v as Record<string, unknown>)[k] !== undefined) : [];
-      // Pick the member that owns the given keys; report keys from different members as a conflict.
-      const owners = keySets.map((set, i) => ({ i, hits: present.filter((k) => set.has(k)).length }));
-      const best = owners.filter((o) => o.hits > 0).sort((a, b) => b.hits - a.hits);
-      const conflicting = present.filter((k) => best.length > 0 && !keySets[best[0]!.i]!.has(k) && keys.includes(k));
-      if (conflicting.length) {
-        return fail(`Props ${present.filter((k) => keys.includes(k)).map((k) => `"${k}"`).join(', ')} cannot be combined (mutually exclusive)`);
-      }
-      const order = best.length ? [best[0]!.i, ...[...members.keys()].filter((i) => i !== best[0]!.i)] : [...members.keys()];
-      const issues: Issue[] = [];
-      for (const i of order) {
-        const r = runSync(members[i]!, v);
-        if (!r.issues) return { value: r.value as ExclusiveOf<InferOutput<Members[number]>> };
-        if (i === order[0]) issues.push(...r.issues);
-      }
-      return { issues };
-    }, keys), members);
+    const keySets = members.map(
+      (m) => new Set((m as { keys?: readonly string[] }).keys ?? []),
+    );
+    return inherit(
+      make<ExclusiveOf<InferOutput<Members[number]>>>((v) => {
+        const present =
+          v && typeof v === 'object'
+            ? Object.keys(v).filter(
+                (k) => (v as Record<string, unknown>)[k] !== undefined,
+              )
+            : [];
+        // Pick the member that owns the given keys; report keys from different members as a conflict.
+        const owners = keySets.map((set, i) => ({
+          i,
+          hits: present.filter((k) => set.has(k)).length,
+        }));
+        const best = owners
+          .filter((o) => o.hits > 0)
+          .sort((a, b) => b.hits - a.hits);
+        const conflicting = present.filter(
+          (k) =>
+            best.length > 0 && !keySets[best[0]!.i]!.has(k) && keys.includes(k),
+        );
+        if (conflicting.length) {
+          return fail(
+            `Props ${present
+              .filter((k) => keys.includes(k))
+              .map((k) => `"${k}"`)
+              .join(', ')} cannot be combined (mutually exclusive)`,
+          );
+        }
+        const order = best.length
+          ? [best[0]!.i, ...[...members.keys()].filter((i) => i !== best[0]!.i)]
+          : [...members.keys()];
+        const issues: Issue[] = [];
+        for (const i of order) {
+          const r = runSync(members[i]!, v);
+          if (!r.issues)
+            return {
+              value: r.value as ExclusiveOf<InferOutput<Members[number]>>,
+            };
+          if (i === order[0]) issues.push(...r.issues);
+        }
+        return { issues };
+      }, keys),
+      members,
+    );
   },
 
   unknown: (): Schema<unknown> => make((v) => ({ value: v })),
 
   /** Custom check with a type predicate or a boolean check; `T` is what the value is narrowed to. */
-  custom: <T>(check: (value: unknown) => boolean, message = 'Custom check failed'): Schema<T> =>
-    make((v) => (check(v) ? { value: v as T } : fail(message))),
+  custom: <T>(
+    check: (value: unknown) => boolean,
+    message = 'Custom check failed',
+  ): Schema<T> => make((v) => (check(v) ? { value: v as T } : fail(message))),
 };
 
 function memberKeys(members: readonly StandardSchemaV1[]): string[] {
-  return [...new Set(members.flatMap((m) => (m as { keys?: readonly string[] }).keys ?? []))];
+  return [
+    ...new Set(
+      members.flatMap((m) => (m as { keys?: readonly string[] }).keys ?? []),
+    ),
+  ];
 }
 
 /** Run a Standard Schema synchronously. Async validators are reported as an issue. */
-export function runSync<T>(schema: StandardSchemaV1<unknown, T>, value: unknown): StandardSchemaV1.Result<T> {
+export function runSync<T>(
+  schema: StandardSchemaV1<unknown, T>,
+  value: unknown,
+): StandardSchemaV1.Result<T> {
   const result = schema['~standard'].validate(value);
   if (result instanceof Promise) {
-    return { issues: [{ message: 'Async validation is not supported in TSProse tags (JSX evaluation is synchronous)' }] };
+    return {
+      issues: [
+        {
+          message:
+            'Async validation is not supported in TSProse tags (JSX evaluation is synchronous)',
+        },
+      ],
+    };
   }
   return result;
 }
@@ -361,15 +497,20 @@ export function validateProps(
   if (isObjectSchema(spec)) {
     // Whole-object schema: undefined values mean "not given".
     const given: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(input)) if (v !== undefined && !ignore.has(k)) given[k] = v;
+    for (const [k, v] of Object.entries(input))
+      if (v !== undefined && !ignore.has(k)) given[k] = v;
     const r = runSync(spec, given);
-    if (!r.issues) return { value: (r.value ?? {}) as Record<string, unknown>, issues: [] };
+    if (!r.issues)
+      return { value: (r.value ?? {}) as Record<string, unknown>, issues: [] };
     return {
       value: given,
       issues: r.issues.map((issue) => {
         const path = formatIssuePath(issue);
         const key = path?.split('.')[0] ?? '';
-        return { key, message: path ? `${path}: ${issue.message}` : issue.message };
+        return {
+          key,
+          message: path ? `${path}: ${issue.message}` : issue.message,
+        };
       }),
     };
   }
@@ -381,7 +522,12 @@ export function validateProps(
     if (r.issues) {
       for (const issue of r.issues) {
         const path = formatIssuePath(issue);
-        issues.push({ key, message: path ? `${key}.${path}: ${issue.message}` : `${key}: ${issue.message}` });
+        issues.push({
+          key,
+          message: path
+            ? `${key}.${path}: ${issue.message}`
+            : `${key}: ${issue.message}`,
+        });
       }
     } else if (r.value !== undefined) {
       value[key] = r.value;
@@ -397,5 +543,7 @@ export function validateProps(
 
 /** Dotted path of a Standard Schema issue (`a.0.b`), or undefined for a root issue. */
 function formatIssuePath(issue: StandardSchemaV1.Issue): string | undefined {
-  return issue.path?.map((p) => (typeof p === 'object' ? String(p.key) : String(p))).join('.');
+  return issue.path
+    ?.map((p) => (typeof p === 'object' ? String(p.key) : String(p)))
+    .join('.');
 }

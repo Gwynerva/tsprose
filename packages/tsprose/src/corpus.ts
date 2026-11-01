@@ -18,11 +18,17 @@ export class Corpus {
   add(doc: Document): this;
   add(a: string | Document, b?: Document): this {
     const doc = typeof a === 'string' ? b! : a;
-    const documentId = typeof a === 'string' ? a : (doc.id ?? doc.scope.documentId);
-    if (!documentId) throw new TypeError('Corpus: document has no id (pass one to add() or to defineDocument({ id }))');
+    const documentId =
+      typeof a === 'string' ? a : (doc.id ?? doc.scope.documentId);
+    if (!documentId)
+      throw new TypeError(
+        'Corpus: document has no id (pass one to add() or to defineDocument({ id }))',
+      );
     const existing = this.docs.get(documentId);
     if (existing && existing !== doc) {
-      throw new TypeError(`Corpus: document id "${documentId}" is already taken (use set() to replace it)`);
+      throw new TypeError(
+        `Corpus: document id "${documentId}" is already taken (use set() to replace it)`,
+      );
     }
     return this.bind(documentId, doc);
   }
@@ -41,7 +47,8 @@ export class Corpus {
     const doc = this.docs.get(documentId);
     if (!doc) return false;
     this.docs.delete(documentId);
-    if (doc.scope.url && this.byUrl.get(doc.scope.url) === documentId) this.byUrl.delete(doc.scope.url);
+    if (doc.scope.url && this.byUrl.get(doc.scope.url) === documentId)
+      this.byUrl.delete(doc.scope.url);
     // Unbind, so the module can be added again under another id — unless the document owns its id.
     if (doc.id === undefined) {
       for (const scope of scopesOf(doc)) {
@@ -52,9 +59,14 @@ export class Corpus {
   }
 
   /** Every scope of the document must be unbound or bound to this id (or to the document being replaced). */
-  private checkBinding(documentId: string, doc: Document, replacing?: Document): void {
+  private checkBinding(
+    documentId: string,
+    doc: Document,
+    replacing?: Document,
+  ): void {
     for (const scope of scopesOf(doc)) {
-      if (scope.documentId === undefined || scope.documentId === documentId) continue;
+      if (scope.documentId === undefined || scope.documentId === documentId)
+        continue;
       if (replacing && scopesOf(replacing).includes(scope)) continue;
       throw new TypeError(
         `Corpus: document "${documentId}" was already bound to id "${scope.documentId}" (defineDocument({ id }) or a shared refs module?)`,
@@ -97,8 +109,12 @@ export class Corpus {
 
   /** Resolve a handle to its document id (undefined when its document is not in the corpus). */
   resolve(ref: Ref): { documentId: string; name: string } | undefined {
-    const documentId = ref.scope.documentId ?? (ref.scope.url ? this.byUrl.get(ref.scope.url) : undefined);
-    return documentId && this.docs.has(documentId) ? { documentId, name: ref.name } : undefined;
+    const documentId =
+      ref.scope.documentId ??
+      (ref.scope.url ? this.byUrl.get(ref.scope.url) : undefined);
+    return documentId && this.docs.has(documentId)
+      ? { documentId, name: ref.name }
+      : undefined;
   }
 }
 

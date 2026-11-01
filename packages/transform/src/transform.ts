@@ -80,7 +80,15 @@ const SPACE = '{" "}';
 const BREAK = '{"\\u2029"}';
 
 interface Item {
-  readonly kind: 'text' | 'element' | 'expression' | 'comment' | 'space' | 'explicitSpace' | 'glue' | 'break';
+  readonly kind:
+    | 'text'
+    | 'element'
+    | 'expression'
+    | 'comment'
+    | 'space'
+    | 'explicitSpace'
+    | 'glue'
+    | 'break';
   readonly start: number;
   readonly end: number;
   /** text items: offsets of the first/last non-whitespace characters */
@@ -99,11 +107,18 @@ interface Item {
   readonly tagName?: string | undefined;
 }
 
-export function transform(source: string, fileName: string, options: TransformOptions = {}): TransformResult {
+export function transform(
+  source: string,
+  fileName: string,
+  options: TransformOptions = {},
+): TransformResult {
   const closing = options.closing ?? DEFAULT_CLOSING;
   const opening = options.opening ?? DEFAULT_OPENING;
   const parsed = parseProse(source, fileName);
-  const insertions = new Map<number, { between: 'text' | 'elements' | 'paragraph'; text: string }>();
+  const insertions = new Map<
+    number,
+    { between: 'text' | 'elements' | 'paragraph'; text: string }
+  >();
   const isBlock = options.isBlock;
   const paragraphs = options.paragraphs === true;
   /** Pairs [element start, attribute insertion offset]. */
@@ -115,7 +130,13 @@ export function transform(source: string, fileName: string, options: TransformOp
       const child = classifyJsxChild(node, source);
       switch (child.kind) {
         case 'whitespace':
-          items.push({ kind: 'space', start: node.start, end: node.end, separatorNewline: hasNewline(child.raw), separatorBlank: hasBlankLine(child.raw) });
+          items.push({
+            kind: 'space',
+            start: node.start,
+            end: node.end,
+            separatorNewline: hasNewline(child.raw),
+            separatorBlank: hasBlankLine(child.raw),
+          });
           break;
         case 'text': {
           const raw = child.raw;
@@ -140,7 +161,10 @@ export function transform(source: string, fileName: string, options: TransformOp
             // Blank lines inside the text body: a paragraph break after each run.
             const body = source.slice(contentStart, contentEnd);
             for (const m of body.matchAll(BLANK_RUN)) {
-              insertions.set(contentStart + m.index + m[0].length, { between: 'paragraph', text: BREAK });
+              insertions.set(contentStart + m.index + m[0].length, {
+                between: 'paragraph',
+                text: BREAK,
+              });
             }
           }
           break;
@@ -151,10 +175,19 @@ export function transform(source: string, fileName: string, options: TransformOp
           items.push({ kind: child.kind, start: node.start, end: node.end });
           break;
         case 'space':
-          items.push({ kind: 'explicitSpace', start: node.start, end: node.end });
+          items.push({
+            kind: 'explicitSpace',
+            start: node.start,
+            end: node.end,
+          });
           break;
         case 'element':
-          items.push({ kind: 'element', start: node.start, end: node.end, tagName: child.name });
+          items.push({
+            kind: 'element',
+            start: node.start,
+            end: node.end,
+            tagName: child.name,
+          });
           break;
         case 'fragment':
           items.push({ kind: 'element', start: node.start, end: node.end });
@@ -177,14 +210,17 @@ export function transform(source: string, fileName: string, options: TransformOp
       if (item.kind === 'comment') {
         // A blank line before a comment: the paragraph break goes before the comment (it stays with what follows),
         // which keeps the comment's place when another formatter re-lays the file out. Comments are transparent.
-        const blankBefore = blankBetween || (prev?.kind === 'text' && prev.trailingBlank === true);
+        const blankBefore =
+          blankBetween ||
+          (prev?.kind === 'text' && prev.trailingBlank === true);
         if (paragraphs && prev && prev.kind !== 'break' && blankBefore) {
           insertions.set(item.start, { between: 'paragraph', text: BREAK });
           prev = { kind: 'break', start: item.start, end: item.start };
           blankBetween = false;
           newlineBetween = false;
         }
-        if (hasNewline(source.slice(item.start, item.end))) newlineBetween = true;
+        if (hasNewline(source.slice(item.start, item.end)))
+          newlineBetween = true;
         continue;
       }
       if (item.kind === 'explicitSpace') {
@@ -196,22 +232,46 @@ export function transform(source: string, fileName: string, options: TransformOp
       }
       if (prev) {
         const brokeLine =
-          newlineBetween || (prev.kind === 'text' && prev.trailingNewline) || (item.kind === 'text' && item.leadingNewline);
+          newlineBetween ||
+          (prev.kind === 'text' && prev.trailingNewline) ||
+          (item.kind === 'text' && item.leadingNewline);
         const brokeParagraph =
           paragraphs &&
-          (blankBetween || (prev.kind === 'text' && prev.trailingBlank) || (item.kind === 'text' && item.leadingBlank));
+          (blankBetween ||
+            (prev.kind === 'text' && prev.trailingBlank) ||
+            (item.kind === 'text' && item.leadingBlank));
         const touchesBreak = prev.kind === 'break' || item.kind === 'break';
         if (brokeParagraph && !touchesBreak) {
-          insertions.set(item.kind === 'text' ? item.contentStart! : item.start, { between: 'paragraph', text: BREAK });
-        } else if (brokeLine && !touchesBreak && prev.kind !== 'glue' && item.kind !== 'glue') {
+          insertions.set(
+            item.kind === 'text' ? item.contentStart! : item.start,
+            { between: 'paragraph', text: BREAK },
+          );
+        } else if (
+          brokeLine &&
+          !touchesBreak &&
+          prev.kind !== 'glue' &&
+          item.kind !== 'glue'
+        ) {
           const prevSpace = prev.kind === 'explicitSpace';
-          const closes = item.kind === 'text' && closing.includes(item.firstChar!);
-          const opens = prev.kind === 'text' && opening.includes(prev.lastChar!);
+          const closes =
+            item.kind === 'text' && closing.includes(item.firstChar!);
+          const opens =
+            prev.kind === 'text' && opening.includes(prev.lastChar!);
           const bothBlocks =
-            !!isBlock && prev.tagName !== undefined && item.tagName !== undefined && isBlock(prev.tagName) && isBlock(item.tagName);
+            !!isBlock &&
+            prev.tagName !== undefined &&
+            item.tagName !== undefined &&
+            isBlock(prev.tagName) &&
+            isBlock(item.tagName);
           if (!prevSpace && !closes && !opens && !bothBlocks) {
-            const between = prev.kind === 'text' || item.kind === 'text' ? 'text' : 'elements';
-            insertions.set(item.kind === 'text' ? item.contentStart! : item.start, { between, text: SPACE });
+            const between =
+              prev.kind === 'text' || item.kind === 'text'
+                ? 'text'
+                : 'elements';
+            insertions.set(
+              item.kind === 'text' ? item.contentStart! : item.start,
+              { between, text: SPACE },
+            );
           }
         }
       }
@@ -222,11 +282,17 @@ export function transform(source: string, fileName: string, options: TransformOp
   };
 
   walkAst<OxcNode>(parsed.program, (n) => {
-    if (n.type === 'JSXElement' || n.type === 'JSXFragment') visitChildren(n.children as OxcNode[]);
+    if (n.type === 'JSXElement' || n.type === 'JSXFragment')
+      visitChildren(n.children as OxcNode[]);
     if (options.positions && n.type === 'JSXOpeningElement') {
-      const hasPos = (n.attributes as OxcNode[]).some((a) => a.type === 'JSXAttribute' && (a.name as OxcNode).name === '__tsprosePos');
+      const hasPos = (n.attributes as OxcNode[]).some(
+        (a) =>
+          a.type === 'JSXAttribute' &&
+          (a.name as OxcNode).name === '__tsprosePos',
+      );
       // The attribute goes after the name and its type arguments (`<List<Item> …>`).
-      const after = (n.typeArguments as OxcNode | null | undefined) ?? (n.name as OxcNode);
+      const after =
+        (n.typeArguments as OxcNode | null | undefined) ?? (n.name as OxcNode);
       if (!hasPos) positionAt.push(n.start, after.end);
     }
   });
@@ -234,10 +300,14 @@ export function transform(source: string, fileName: string, options: TransformOp
   const ms = new MagicString(source);
   const sorted = [...insertions.keys()].sort((a, b) => a - b);
   const lineStarts = computeLineStarts(source);
-  for (const offset of sorted) ms.appendLeft(offset, insertions.get(offset)!.text);
+  for (const offset of sorted)
+    ms.appendLeft(offset, insertions.get(offset)!.text);
   for (let i = 0; i < positionAt.length; i += 2) {
     const { line, column } = positionOf(lineStarts, positionAt[i]!);
-    ms.appendLeft(positionAt[i + 1]!, ` __tsprosePos={[__tsproseFile, ${line}, ${column}]}`);
+    ms.appendLeft(
+      positionAt[i + 1]!,
+      ` __tsprosePos={[__tsproseFile, ${line}, ${column}]}`,
+    );
   }
   if (positionAt.length) {
     const declaration = `const __tsproseFile = ${JSON.stringify(options.positionsFile ?? fileName)};`;
@@ -250,7 +320,14 @@ export function transform(source: string, fileName: string, options: TransformOp
 
   return {
     code: changed ? ms.toString() : source,
-    map: options.sourceMap === false || !changed ? undefined : ms.generateMap({ source: fileName, hires: true, includeContent: true }),
+    map:
+      options.sourceMap === false || !changed
+        ? undefined
+        : ms.generateMap({
+            source: fileName,
+            hires: true,
+            includeContent: true,
+          }),
     insertions: sorted.map((offset) => {
       const { line, column } = positionOf(lineStarts, offset);
       return { offset, line, column, between: insertions.get(offset)!.between };
@@ -263,7 +340,11 @@ export function transform(source: string, fileName: string, options: TransformOp
 function prologueEndOf(program: OxcNode): number {
   let end = (program.hashbang as OxcNode | null | undefined)?.end ?? 0;
   for (const statement of program.body as OxcNode[]) {
-    if (statement.type !== 'ExpressionStatement' || typeof statement.directive !== 'string') break;
+    if (
+      statement.type !== 'ExpressionStatement' ||
+      typeof statement.directive !== 'string'
+    )
+      break;
     end = statement.end;
   }
   return end;

@@ -14,7 +14,8 @@ export interface DocumentOptions {
    */
   readonly id?: string | undefined;
   /** Refs declared for this document (from `defineRefs`). One object or several. */
-  readonly refs?: Refs<RefsTemplate> | readonly Refs<RefsTemplate>[] | undefined;
+  readonly refs?:
+    Refs<RefsTemplate> | readonly Refs<RefsTemplate>[] | undefined;
   /** Module URL when no refs are given (otherwise the refs' scope is reused). */
   readonly url?: string | undefined;
   /** Free-form document metadata (title, language, …) available to hooks. */
@@ -35,24 +36,52 @@ export interface Document {
   readonly id?: string | undefined;
 }
 
-export function defineDocument(content: () => ComponentResult, options: DocumentOptions = {}): Document {
-  const refs = options.refs === undefined ? [] : Array.isArray(options.refs) ? [...options.refs] : [options.refs as Refs<RefsTemplate>];
+export function defineDocument(
+  content: () => ComponentResult,
+  options: DocumentOptions = {},
+): Document {
+  const refs =
+    options.refs === undefined
+      ? []
+      : Array.isArray(options.refs)
+        ? [...options.refs]
+        : [options.refs as Refs<RefsTemplate>];
   const first = refs[0];
-  const scope: RefScope = first ? first[REFS] : { url: options.url, documentId: undefined };
+  const scope: RefScope = first
+    ? first[REFS]
+    : { url: options.url, documentId: undefined };
   // Several refs objects must agree on the document.
-  const ids = new Set([scope, ...refs.map((r) => r[REFS])].map((s) => s.documentId).filter((id) => id !== undefined));
+  const ids = new Set(
+    [scope, ...refs.map((r) => r[REFS])]
+      .map((s) => s.documentId)
+      .filter((id) => id !== undefined),
+  );
   if (options.id !== undefined) ids.add(options.id);
   if (ids.size > 1) {
-    throw new TypeError(`defineDocument: refs objects / id belong to different documents (${[...ids].join(', ')})`);
+    throw new TypeError(
+      `defineDocument: refs objects / id belong to different documents (${[...ids].join(', ')})`,
+    );
   }
   if (options.id !== undefined) {
-    for (const s of [scope, ...refs.map((r) => r[REFS])]) s.documentId = options.id;
+    for (const s of [scope, ...refs.map((r) => r[REFS])])
+      s.documentId = options.id;
   }
-  return { [DOCUMENT]: true, content, refs, scope, meta: options.meta ?? {}, ...(options.id !== undefined ? { id: options.id } : {}) };
+  return {
+    [DOCUMENT]: true,
+    content,
+    refs,
+    scope,
+    meta: options.meta ?? {},
+    ...(options.id !== undefined ? { id: options.id } : {}),
+  };
 }
 
 export function isDocument(value: unknown): value is Document {
-  return typeof value === 'object' && value !== null && (value as Document)[DOCUMENT] === true;
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    (value as Document)[DOCUMENT] === true
+  );
 }
 
 export const ROOT_TYPE = 'root';
@@ -64,7 +93,10 @@ export function evaluateDocument(doc: Document | BaseNode): BaseNode {
     return toRoot(doc.content());
   } catch (error) {
     const bag = new DiagnosticBag();
-    bag.error('document/threw', `Document content threw: ${errorMessage(error)}`);
+    bag.error(
+      'document/threw',
+      `Document content threw: ${errorMessage(error)}`,
+    );
     const root = toRoot(undefined);
     root.diagnostics = bag.items;
     return root;
@@ -72,7 +104,10 @@ export function evaluateDocument(doc: Document | BaseNode): BaseNode {
 }
 
 function toRoot(value: unknown): BaseNode {
-  const fragment = isAnyNode(value) && !Array.isArray(value) && value.type !== 'fragment' ? makeFragment([value]) : makeFragment(value);
+  const fragment =
+    isAnyNode(value) && !Array.isArray(value) && value.type !== 'fragment'
+      ? makeFragment([value])
+      : makeFragment(value);
   return {
     type: ROOT_TYPE,
     kind: 'block',

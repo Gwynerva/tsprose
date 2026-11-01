@@ -14,7 +14,10 @@ export interface JitiTransformInput {
  * const jiti = createJiti(root, { transform: withTSProse(myTransform) });
  * ```
  */
-export function withTSProse<T extends JitiTransformInput, R>(next: (opts: T) => R, options: PluginOptions = {}): (opts: T) => R {
+export function withTSProse<T extends JitiTransformInput, R>(
+  next: (opts: T) => R,
+  options: PluginOptions = {},
+): (opts: T) => R {
   return (opts) => {
     const filename = opts.filename;
     if (!filename) return next(opts);
@@ -27,8 +30,13 @@ export function withTSProse<T extends JitiTransformInput, R>(next: (opts: T) => 
  * Pre-transform a single source (for loaders that expose a plain `(source, filename)` hook). Files outside
  * `include` and files with parse errors come back unchanged.
  */
-export function transformSource(source: string, filename: string, options: PluginOptions = {}): string {
-  if (!shouldTransform(filename, options.include) || !mayContainJsx(source)) return source;
+export function transformSource(
+  source: string,
+  filename: string,
+  options: PluginOptions = {},
+): string {
+  if (!shouldTransform(filename, options.include) || !mayContainJsx(source))
+    return source;
   const result = transform(source, filename, options);
   return result.errors.length ? source : result.code;
 }

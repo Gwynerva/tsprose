@@ -49,18 +49,31 @@ export interface SpawnSpec {
  * `cmd.exe` (needed for `.cmd` shims such as `bunx.cmd`/`npx.cmd`), as one command line with every word quoted, so
  * paths with spaces or `&` stay single arguments.
  */
-export function spawnSpec(command: string, args: readonly string[], platform: NodeJS.Platform = process.platform): SpawnSpec {
+export function spawnSpec(
+  command: string,
+  args: readonly string[],
+  platform: NodeJS.Platform = process.platform,
+): SpawnSpec {
   const [file, ...pre] = splitCommand(command);
   if (!file) throw new Error('tsprose.fmt.command is empty');
-  if (platform !== 'win32') return { file, args: [...pre, ...args], shell: false };
-  return { file: [file, ...pre, ...args].map(quoteWindowsArg).join(' '), args: [], shell: true };
+  if (platform !== 'win32')
+    return { file, args: [...pre, ...args], shell: false };
+  return {
+    file: [file, ...pre, ...args].map(quoteWindowsArg).join(' '),
+    args: [],
+    shell: true,
+  };
 }
 
 /**
  * Absolute path of the `tsprose.fmt.config` setting: absolute paths as is; relative ones against the workspace
  * folder, or against the document's directory when the document is outside any workspace. Empty: no config.
  */
-export function resolveConfigPath(setting: string, workspaceFolder: string | undefined, documentPath: string): string | undefined {
+export function resolveConfigPath(
+  setting: string,
+  workspaceFolder: string | undefined,
+  documentPath: string,
+): string | undefined {
   if (!setting) return undefined;
   if (isAbsolute(setting)) return setting;
   return resolve(workspaceFolder ?? dirname(documentPath), setting);

@@ -1,4 +1,11 @@
-import { attributesOf, collectDefinedRefs, forEachJsxElement, rangeOf, refUsage, type EsNode } from '../estree.js';
+import {
+  attributesOf,
+  collectDefinedRefs,
+  forEachJsxElement,
+  rangeOf,
+  refUsage,
+  type EsNode,
+} from '../estree.js';
 import type { Finding } from '../types.js';
 
 /**
@@ -27,17 +34,35 @@ export function checkRefs(program: EsNode): Finding[] {
     for (const [name, prop] of names) {
       const uses = usedNames.get(name);
       if (!uses) {
-        findings.push({ code: 'ref/unused', rule: 'refs', severity: 'error', message: `Ref "${object}.${name}" is declared but never used in this file`, range: rangeOf(prop) });
+        findings.push({
+          code: 'ref/unused',
+          rule: 'refs',
+          severity: 'error',
+          message: `Ref "${object}.${name}" is declared but never used in this file`,
+          range: rangeOf(prop),
+        });
       } else if (uses.length > 1) {
         for (const node of uses.slice(1)) {
-          findings.push({ code: 'ref/duplicate', rule: 'refs', severity: 'error', message: `Ref "${object}.${name}" is used ${uses.length} times; a handle marks exactly one element`, range: rangeOf(node) });
+          findings.push({
+            code: 'ref/duplicate',
+            rule: 'refs',
+            severity: 'error',
+            message: `Ref "${object}.${name}" is used ${uses.length} times; a handle marks exactly one element`,
+            range: rangeOf(node),
+          });
         }
       }
     }
     for (const [name, uses] of usedNames) {
       if (!names.has(name)) {
         for (const node of uses) {
-          findings.push({ code: 'ref/unknown', rule: 'refs', severity: 'error', message: `"${object}.${name}" is not declared in defineRefs`, range: rangeOf(node) });
+          findings.push({
+            code: 'ref/unknown',
+            rule: 'refs',
+            severity: 'error',
+            message: `"${object}.${name}" is not declared in defineRefs`,
+            range: rangeOf(node),
+          });
         }
       }
     }

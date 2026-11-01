@@ -1,7 +1,24 @@
 import { describe, expect, it } from 'vitest';
-import { defineBlock, defineInline, defineRefs, isTag, s, type BaseNode } from 'tsprose';
+import {
+  defineBlock,
+  defineInline,
+  defineRefs,
+  isTag,
+  s,
+  type BaseNode,
+} from 'tsprose';
 import { getRefHandle, REF } from 'tsprose/internal';
-import { B, H1, H2, Heading, Image, P, Qed, Theorem, Details } from '../fixtures/tags.js';
+import {
+  B,
+  H1,
+  H2,
+  Heading,
+  Image,
+  P,
+  Qed,
+  Theorem,
+  Details,
+} from '../fixtures/tags.js';
 
 const codes = (node: BaseNode) => (node.diagnostics ?? []).map((d) => d.code);
 
@@ -9,24 +26,42 @@ describe('defineBlock / defineInline', () => {
   it('creates branded callable tags with normalized defs', () => {
     expect(isTag(P)).toBe(true);
     expect(isTag(() => null)).toBe(false);
-    expect(P.def).toMatchObject({ name: 'paragraph', kind: 'block', children: 'inline', ref: 'optional' });
-    expect(Qed.def).toMatchObject({ name: 'qed', kind: 'block', children: 'none', ref: 'none', props: {} });
+    expect(P.def).toMatchObject({
+      name: 'paragraph',
+      kind: 'block',
+      children: 'inline',
+      ref: 'optional',
+    });
+    expect(Qed.def).toMatchObject({
+      name: 'qed',
+      kind: 'block',
+      children: 'none',
+      ref: 'none',
+      props: {},
+    });
     expect(P.name).toBe('paragraph');
   });
 
-  it.each([['', 'Invalid tag name'], ['1x', 'Invalid tag name'], ['text', 'reserved'], ['fragment', 'reserved']])(
-    'rejects bad names (%s)',
-    (name, message) => {
-      expect(() => defineBlock({ name: name as 'x' })).toThrow(message);
-    },
-  );
+  it.each([
+    ['', 'Invalid tag name'],
+    ['1x', 'Invalid tag name'],
+    ['text', 'reserved'],
+    ['fragment', 'reserved'],
+  ])('rejects bad names (%s)', (name, message) => {
+    expect(() => defineBlock({ name: name as 'x' })).toThrow(message);
+  });
 
   it('rejects block children on inline tags', () => {
-    expect(() => defineInline({ name: 'x', children: 'block' as never })).toThrow('cannot accept block children');
+    expect(() =>
+      defineInline({ name: 'x', children: 'block' as never }),
+    ).toThrow('cannot accept block children');
   });
 
   it('rejects patterns mentioning unknown types', () => {
-    const T = defineBlock({ name: 'bad', children: { of: [P], pattern: 'paragraph qed' } });
+    const T = defineBlock({
+      name: 'bad',
+      children: { of: [P], pattern: 'paragraph qed' },
+    });
     expect(() => T({ children: <P>x</P> })).toThrow('not in its children list');
   });
 });
@@ -64,7 +99,9 @@ describe('props', () => {
     expect(H1.def).toBe(Heading.def);
     const node = Heading({ level: 3, children: 'x' });
     expect(node.props.level).toBe(3);
-    expect(codes(Heading({ level: 4 as 1, children: 'x' }))).toEqual(['props/invalid']);
+    expect(codes(Heading({ level: 4 as 1, children: 'x' }))).toEqual([
+      'props/invalid',
+    ]);
   });
 });
 
@@ -76,8 +113,12 @@ describe('refs ($)', () => {
   });
 
   it('required refs are enforced', () => {
-    expect(codes(Theorem({ title: 'T', children: <P>x</P> } as never))).toEqual(['ref/required']);
-    expect(codes(Details({ children: <Qed /> } as never))).toEqual(['ref/required']);
+    expect(codes(Theorem({ title: 'T', children: <P>x</P> } as never))).toEqual(
+      ['ref/required'],
+    );
+    expect(codes(Details({ children: <Qed /> } as never))).toEqual([
+      'ref/required',
+    ]);
   });
 
   it('refs are forbidden on non-referable tags', () => {
@@ -85,14 +126,22 @@ describe('refs ($)', () => {
   });
 
   it('handles must belong to the same definition', () => {
-    const refs = defineRefs('file:///doc/refs.ts', { thm: Theorem, par: P, h: Heading });
+    const refs = defineRefs('file:///doc/refs.ts', {
+      thm: Theorem,
+      par: P,
+      h: Heading,
+    });
     const ok = Theorem({ $: refs.thm, title: 'T', children: <P>x</P> });
     expect(ok.ref).toBe('thm');
     expect(getRefHandle(ok)).toBe(refs.thm);
     expect(refs.thm[REF]).toBe(true);
     expect(refs.thm.scope.url).toBe('file:///doc/refs.ts');
 
-    const wrong = Theorem({ $: refs.par as never, title: 'T', children: <P>x</P> });
+    const wrong = Theorem({
+      $: refs.par as never,
+      title: 'T',
+      children: <P>x</P>,
+    });
     expect(codes(wrong)).toEqual(['ref/mismatch']);
 
     // preset tags share the def → handles for the base tag work
@@ -106,7 +155,9 @@ describe('refs ($)', () => {
 
   it('empty and invalid $ are diagnostics', () => {
     expect(codes(P({ $: '  ', children: 'x' }))).toEqual(['ref/invalid']);
-    expect(codes(P({ $: 42 as never, children: 'x' }))).toEqual(['ref/invalid']);
+    expect(codes(P({ $: 42 as never, children: 'x' }))).toEqual([
+      'ref/invalid',
+    ]);
   });
 });
 
@@ -116,7 +167,9 @@ describe('derive / key metadata on defs', () => {
     expect(typeof Image.def.derive).toBe('function');
     const node = Image({ src: 'cat.png' });
     expect(Image.def.key!(node)).toBe('cat.png');
-    await expect(Image.def.derive!(node, { context: undefined })).resolves.toEqual({ bytes: 700 });
+    await expect(
+      Image.def.derive!(node, { context: undefined }),
+    ).resolves.toEqual({ bytes: 700 });
   });
 });
 
@@ -126,7 +179,10 @@ describe('standard schema interop', () => {
       '~standard': {
         version: 1 as const,
         vendor: 'fake',
-        validate: (v: unknown) => (v === 'ok' ? { value: 'ok' as const } : { issues: [{ message: 'must be ok' }] }),
+        validate: (v: unknown) =>
+          v === 'ok'
+            ? { value: 'ok' as const }
+            : { issues: [{ message: 'must be ok' }] },
         types: undefined as { input: 'ok'; output: 'ok' } | undefined,
       },
     };
@@ -136,8 +192,17 @@ describe('standard schema interop', () => {
   });
 
   it('rejects async validators with a diagnostic', () => {
-    const asyncSchema = { '~standard': { version: 1 as const, vendor: 'x', validate: async (v: unknown) => ({ value: v }) } };
-    const T = defineBlock({ name: 'asyncprops', props: { v: s.optional(asyncSchema) } });
+    const asyncSchema = {
+      '~standard': {
+        version: 1 as const,
+        vendor: 'x',
+        validate: async (v: unknown) => ({ value: v }),
+      },
+    };
+    const T = defineBlock({
+      name: 'asyncprops',
+      props: { v: s.optional(asyncSchema) },
+    });
     expect(codes(T({ v: 1 }))).toEqual(['props/invalid']);
     expect(T({ v: 1 }).diagnostics![0]!.message).toContain('Async');
   });

@@ -1,10 +1,31 @@
 import { normalizeWhitespace, segmentLooseInline } from './children.js';
 import type { Corpus } from './corpus.js';
-import { CorpusIndex, type CorpusIndexOptions, type ResolveFn } from './corpus-index.js';
+import {
+  CorpusIndex,
+  type CorpusIndexOptions,
+  type ResolveFn,
+} from './corpus-index.js';
 import type { BaseDef, DeriveContext } from './def.js';
-import { DiagnosticBag, TSProseError, hasErrors, type Diagnostic, type Severity } from './diagnostics.js';
-import { evaluateDocument, isDocument, ROOT_TYPE, type Document } from './document.js';
-import { attachDef, getDef, getKit, getRefHandle, makeFragment } from './element.js';
+import {
+  DiagnosticBag,
+  TSProseError,
+  hasErrors,
+  type Diagnostic,
+  type Severity,
+} from './diagnostics.js';
+import {
+  evaluateDocument,
+  isDocument,
+  ROOT_TYPE,
+  type Document,
+} from './document.js';
+import {
+  attachDef,
+  getDef,
+  getKit,
+  getRefHandle,
+  makeFragment,
+} from './element.js';
 import { contentHash, deriveKey } from './json.js';
 import { wrapperOf, type KitRuntime } from './kit.js';
 import { isTextNode, type AnyNode, type BaseNode } from './node.js';
@@ -26,7 +47,13 @@ import { slugify as defaultSlugify } from './slugify.js';
 import { refPropsOfProps, s } from './standard.js';
 import { defineBlock } from './tag.js';
 import { errorMessage, runPool } from './util.js';
-import { cloneNode, forEachReference, nodesInData, walk, type WalkContext } from './walk.js';
+import {
+  cloneNode,
+  forEachReference,
+  nodesInData,
+  walk,
+  type WalkContext,
+} from './walk.js';
 
 //
 // Built-in transclusion tag
@@ -38,7 +65,10 @@ import { cloneNode, forEachReference, nodesInData, walk, type WalkContext } from
  */
 export const Include = defineBlock({
   name: 'include',
-  props: { of: refSchema({ kind: 'include' }), meta: s.optional(s.record(s.unknown())) },
+  props: {
+    of: refSchema({ kind: 'include' }),
+    meta: s.optional(s.record(s.unknown())),
+  },
 });
 
 /** Non-enumerable marker on transcluded copies: the reference they were included through. */
@@ -55,7 +85,12 @@ export interface HookContext {
   readonly corpus: Corpus | undefined;
   readonly context: unknown;
   /** Report a diagnostic; with a node, its position and path (when visited by the walk) are attached. */
-  report(code: string, message: string, node?: AnyNode, severity?: Severity): void;
+  report(
+    code: string,
+    message: string,
+    node?: AnyNode,
+    severity?: Severity,
+  ): void;
 }
 
 /**
@@ -169,14 +204,19 @@ interface Session {
 export type CompileInput = Document | BaseNode | readonly AnyNode[];
 
 function toInput(input: CompileInput): Document | BaseNode {
-  return Array.isArray(input) ? makeFragment(input) : (input as Document | BaseNode);
+  return Array.isArray(input)
+    ? makeFragment(input)
+    : (input as Document | BaseNode);
 }
 
 /**
  * Compile a document (or nodes): normalize the root → resolve `<Include>`s → collect diagnostics → ids and content
  * hashes → refs and outgoing references → numbering and hooks → derive. Never throws unless `strict`.
  */
-export async function compile(input: CompileInput, options: CompileOptions = {}): Promise<CompileResult> {
+export async function compile(
+  input: CompileInput,
+  options: CompileOptions = {},
+): Promise<CompileResult> {
   const session: Session = { options, results: new Map() };
   return compileInSession(toInput(input), options, session, []);
 }
@@ -192,19 +232,26 @@ export interface CompileSession {
    * Compile a document or nodes. A corpus document compiled with the session options is cached by its id;
    * `overrides` (or a bare node) bypass the cache — the result is fresh and not stored.
    */
-  compile(input: CompileInput, overrides?: Partial<CompileOptions>): Promise<CompileResult>;
+  compile(
+    input: CompileInput,
+    overrides?: Partial<CompileOptions>,
+  ): Promise<CompileResult>;
   /** Results compiled so far, by document id. */
   readonly results: ReadonlyMap<string, Promise<CompileResult>>;
 }
 
-export function createCompileSession(options: CompileOptions = {}): CompileSession {
+export function createCompileSession(
+  options: CompileOptions = {},
+): CompileSession {
   const session: Session = { options, results: new Map() };
   return {
     options,
     results: session.results,
     compile(rawInput, overrides) {
       const input = toInput(rawInput);
-      const merged: CompileOptions = overrides ? { ...options, ...overrides } : options;
+      const merged: CompileOptions = overrides
+        ? { ...options, ...overrides }
+        : options;
       const doc = isDocument(input) ? input : undefined;
       const id = merged.documentId ?? doc?.scope.documentId;
       if (doc && id && merged.corpus?.get(id) === doc && !overrides) {
@@ -251,10 +298,20 @@ export async function compileCorpus(
 }
 
 /** Cached compile of a corpus document with the session options. Failed compilations are not cached. */
-function compileDocumentInSession(id: string, doc: Document, session: Session, chain: readonly string[]): Promise<CompileResult> {
+function compileDocumentInSession(
+  id: string,
+  doc: Document,
+  session: Session,
+  chain: readonly string[],
+): Promise<CompileResult> {
   const existing = session.results.get(id);
   if (existing) return existing;
-  const promise = compileInSession(doc, { ...session.options, documentId: id }, session, chain);
+  const promise = compileInSession(
+    doc,
+    { ...session.options, documentId: id },
+    session,
+    chain,
+  );
   session.results.set(id, promise);
   promise.catch(() => {
     if (session.results.get(id) === promise) session.results.delete(id);
@@ -282,7 +339,15 @@ async function compileInSession(
   normalizeRoot(root, options.kit, bag);
 
   // 2. include (transclusion) — before ids so copies get fresh ids
-  await resolveIncludes(root, doc, documentId, options, session, documentId ? [...chain, documentId] : chain, bag);
+  await resolveIncludes(
+    root,
+    doc,
+    documentId,
+    options,
+    session,
+    documentId ? [...chain, documentId] : chain,
+    bag,
+  );
 
   // 3. collect node diagnostics with paths
   collectNodeDiagnostics(root, bag);
@@ -306,13 +371,30 @@ async function compileInSession(
 
   const diagnostics = bag.items;
   if (options.strict && hasErrors(diagnostics)) {
-    throw new TSProseError(`Compilation of ${documentId ?? 'document'} failed`, diagnostics);
+    throw new TSProseError(
+      `Compilation of ${documentId ?? 'document'} failed`,
+      diagnostics,
+    );
   }
-  return { documentId, root, diagnostics, refs, ids, hashes, derived, outgoing, counters, hooks: hookResults };
+  return {
+    documentId,
+    root,
+    diagnostics,
+    refs,
+    ids,
+    hashes,
+    derived,
+    outgoing,
+    counters,
+    hooks: hookResults,
+  };
 }
 
 /** The compiled document's id: the explicit option wins over the document's own (corpus-bound) id. */
-function ownDocumentId(doc: Document | undefined, options: CompileOptions): string | undefined {
+function ownDocumentId(
+  doc: Document | undefined,
+  options: CompileOptions,
+): string | undefined {
   return options.documentId ?? doc?.scope.documentId;
 }
 
@@ -325,7 +407,11 @@ function ownScopes(doc: Document | undefined): Set<RefScope> {
 // Phases
 //
 
-function normalizeRoot(root: BaseNode, kit: KitRuntime | undefined, bag: DiagnosticBag): void {
+function normalizeRoot(
+  root: BaseNode,
+  kit: KitRuntime | undefined,
+  bag: DiagnosticBag,
+): void {
   if (!root.children) return;
   const nodes = normalizeWhitespace(root.children, 'block');
   const out: AnyNode[] = [];
@@ -335,7 +421,10 @@ function normalizeRoot(root: BaseNode, kit: KitRuntime | undefined, bag: Diagnos
     const wrapper = wrapperOf(kit);
     if (wrapper) {
       const trimmed = normalizeWhitespace(run, 'inline');
-      if (trimmed.length) out.push(wrapper({ children: trimmed }, { pos: run[0]!.pos }) as BaseNode);
+      if (trimmed.length)
+        out.push(
+          wrapper({ children: trimmed }, { pos: run[0]!.pos }) as BaseNode,
+        );
     } else {
       for (const n of run) {
         bag.error(
@@ -398,8 +487,20 @@ function assignIds(
   walk(root, (node, ctx) => {
     if (isTextNode(node) || node.type === ROOT_TYPE) return;
     const def = getDef(node);
-    if (def ? def.ref !== 'none' : node.ref !== undefined || node.id !== undefined) {
-      referable.push({ node, def: def ?? { name: node.type, kind: node.kind, props: {}, children: 'any', ref: 'optional' }, path: [...ctx.path] });
+    if (
+      def ? def.ref !== 'none' : node.ref !== undefined || node.id !== undefined
+    ) {
+      referable.push({
+        node,
+        def: def ?? {
+          name: node.type,
+          kind: node.kind,
+          props: {},
+          children: 'any',
+          ref: 'optional',
+        },
+        path: [...ctx.path],
+      });
     }
   });
 
@@ -416,13 +517,23 @@ function assignIds(
     if (node.ref === undefined) continue;
     const id = slug(node.ref);
     if (!id) {
-      bag.error('ref/invalid', `Ref "${node.ref}" produces an empty id`, node.pos, path);
+      bag.error(
+        'ref/invalid',
+        `Ref "${node.ref}" produces an empty id`,
+        node.pos,
+        path,
+      );
       continue;
     }
     if (ids.has(id)) {
       const other = ids.get(id)!;
       if (other.ref !== node.ref) {
-        bag.error('ref/collision', `Refs "${other.ref}" and "${node.ref}" produce the same id "${id}"`, node.pos, path);
+        bag.error(
+          'ref/collision',
+          `Refs "${other.ref}" and "${node.ref}" produce the same id "${id}"`,
+          node.pos,
+          path,
+        );
       }
       node.id = take(id, node);
     } else {
@@ -440,7 +551,12 @@ function assignIds(
         const key = keyFn(node);
         if (key) base = slug(key);
       } catch (error) {
-        bag.error('tag/key', `<${node.type}> key() threw: ${errorMessage(error)}`, node.pos, path);
+        bag.error(
+          'tag/key',
+          `<${node.type}> key() threw: ${errorMessage(error)}`,
+          node.pos,
+          path,
+        );
       }
     }
     if (!base) base = `${node.type}-${hashes.get(node)!.slice(0, 10)}`;
@@ -448,7 +564,12 @@ function assignIds(
   }
 }
 
-function checkRefs(root: BaseNode, doc: Document | undefined, refs: Map<string, BaseNode>, bag: DiagnosticBag): void {
+function checkRefs(
+  root: BaseNode,
+  doc: Document | undefined,
+  refs: Map<string, BaseNode>,
+  bag: DiagnosticBag,
+): void {
   const declared = new Map<string, Ref>();
   const scopes = ownScopes(doc);
   for (const r of doc?.refs ?? []) {
@@ -473,14 +594,24 @@ function checkRefs(root: BaseNode, doc: Document | undefined, refs: Map<string, 
   });
   for (const [name, uses] of used) {
     for (const { node, path } of uses.slice(1)) {
-      bag.error('ref/duplicate', `Ref "${name}" is used by ${uses.length} elements`, node.pos, path);
+      bag.error(
+        'ref/duplicate',
+        `Ref "${name}" is used by ${uses.length} elements`,
+        node.pos,
+        path,
+      );
     }
     refs.set(name, uses[0]!.node);
   }
   for (const [name, handle] of declared) {
     if (!used.has(name)) {
-      const where = handle.scope.url ? ` (declared in ${handle.scope.url})` : '';
-      bag.error('ref/unused', `Ref "${name}" (<${handle.def.name}>) is declared but never used in the document${where}`);
+      const where = handle.scope.url
+        ? ` (declared in ${handle.scope.url})`
+        : '';
+      bag.error(
+        'ref/unused',
+        `Ref "${name}" (<${handle.def.name}>) is declared but never used in the document${where}`,
+      );
     }
   }
 }
@@ -496,48 +627,104 @@ function collectOutgoing(
   const scopes = ownScopes(doc);
   walk(root, (node, ctx) => {
     if (isTextNode(node)) return;
-    const within = [...ctx.ancestors, node].map((n) => n.id).filter((id): id is string => id !== undefined);
+    const within = [...ctx.ancestors, node]
+      .map((n) => n.id)
+      .filter((id): id is string => id !== undefined);
     const path = [...ctx.path];
-    const push = (prop: string, ref: Ref | RefTarget, target: Address | undefined, kind: string, expects?: string) =>
-      out.push({ node, prop, ref, target, kind, expects, within, path });
+    const push = (
+      prop: string,
+      ref: Ref | RefTarget,
+      target: Address | undefined,
+      kind: string,
+      expects?: string,
+    ) => out.push({ node, prop, ref, target, kind, expects, within, path });
 
     // Transcluded copy: its include reference is an outgoing reference (the include phase reported problems);
     // the copy's own props are scanned below like any node's.
-    const included = (node as unknown as Record<symbol, Ref | RefTarget | undefined>)[INCLUDE_REF];
+    const included = (
+      node as unknown as Record<symbol, Ref | RefTarget | undefined>
+    )[INCLUDE_REF];
     if (included) {
-      const from = node.meta.includedFrom as { documentId: string; name: string };
-      push('of', included, { documentId: from.documentId, name: from.name }, 'include');
+      const from = node.meta.includedFrom as {
+        documentId: string;
+        name: string;
+      };
+      push(
+        'of',
+        included,
+        { documentId: from.documentId, name: from.name },
+        'include',
+      );
     }
     if (node.type === Include.def.name) {
       // An unresolved <Include> (resolved ones were replaced by their copies).
       const value = node.props.of;
-      if (isReferenceValue(value)) push('of', isRef(value) ? value : toRefTarget(value), undefined, 'include');
+      if (isReferenceValue(value))
+        push(
+          'of',
+          isRef(value) ? value : toRefTarget(value),
+          undefined,
+          'include',
+        );
       return;
     }
 
     const kinds = refPropsOfProps(getDef(node)?.props);
     forEachReference(node, (prop, value, inProps) => {
-        const meta = inProps ? kinds[prop] : undefined;
-        let target: Address | undefined;
-        if (isRef(value)) {
-          const own = scopes.has(value.scope);
-          const targetDoc = own ? documentId : corpus ? corpus.resolve(value)?.documentId : value.scope.documentId;
-          target = targetDoc ? { documentId: targetDoc, name: value.name } : undefined;
-          if (!target) {
-            const where = value.scope.url ? ` (${value.scope.url})` : '';
-            if (own) {
-              bag.error('ref/unresolved', `Ref "${value.name}" belongs to this document, which has no id (compile it with a documentId or in a corpus)`, node.pos, path);
-            } else if (corpus) {
-              bag.error('ref/unresolved', `Ref "${value.name}"${where} points to a document that is not in the corpus`, node.pos, path);
-            } else {
-              bag.warning('ref/unresolved', `Ref "${value.name}"${where} cannot be resolved without a corpus`, node.pos, path);
-            }
+      const meta = inProps ? kinds[prop] : undefined;
+      let target: Address | undefined;
+      if (isRef(value)) {
+        const own = scopes.has(value.scope);
+        const targetDoc = own
+          ? documentId
+          : corpus
+            ? corpus.resolve(value)?.documentId
+            : value.scope.documentId;
+        target = targetDoc
+          ? { documentId: targetDoc, name: value.name }
+          : undefined;
+        if (!target) {
+          const where = value.scope.url ? ` (${value.scope.url})` : '';
+          if (own) {
+            bag.error(
+              'ref/unresolved',
+              `Ref "${value.name}" belongs to this document, which has no id (compile it with a documentId or in a corpus)`,
+              node.pos,
+              path,
+            );
+          } else if (corpus) {
+            bag.error(
+              'ref/unresolved',
+              `Ref "${value.name}"${where} points to a document that is not in the corpus`,
+              node.pos,
+              path,
+            );
+          } else {
+            bag.warning(
+              'ref/unresolved',
+              `Ref "${value.name}"${where} cannot be resolved without a corpus`,
+              node.pos,
+              path,
+            );
           }
-        } else {
-          target = addressOf(value);
-          if (!target) bag.error('ref/unresolved', `Reference "${referenceLabel(value)}" has no address`, node.pos, path);
         }
-        push(prop, isRef(value) ? value : toRefTarget(value), target, meta?.kind ?? 'link', meta?.tag);
+      } else {
+        target = addressOf(value);
+        if (!target)
+          bag.error(
+            'ref/unresolved',
+            `Reference "${referenceLabel(value)}" has no address`,
+            node.pos,
+            path,
+          );
+      }
+      push(
+        prop,
+        isRef(value) ? value : toRefTarget(value),
+        target,
+        meta?.kind ?? 'link',
+        meta?.tag,
+      );
     });
   });
   return out;
@@ -552,10 +739,20 @@ async function resolveIncludes(
   chain: readonly string[],
   bag: DiagnosticBag,
 ): Promise<void> {
-  const includes: { node: BaseNode; parent: BaseNode; index: number; path: string[] }[] = [];
+  const includes: {
+    node: BaseNode;
+    parent: BaseNode;
+    index: number;
+    path: string[];
+  }[] = [];
   walk(root, (node, ctx) => {
     if (!isTextNode(node) && node.type === Include.def.name && ctx.parent) {
-      includes.push({ node, parent: ctx.parent, index: ctx.index, path: [...ctx.path] });
+      includes.push({
+        node,
+        parent: ctx.parent,
+        index: ctx.index,
+        path: [...ctx.path],
+      });
     }
   });
   if (!includes.length) return;
@@ -567,39 +764,81 @@ async function resolveIncludes(
     if (!isReferenceValue(value)) continue; // reported by props validation
     const label = referenceLabel(value);
     const address = isRef(value) ? corpus?.resolve(value) : addressOf(value);
-    const own = isRef(value) ? scopes.has(value.scope) : !!address && address.documentId === documentId;
+    const own = isRef(value)
+      ? scopes.has(value.scope)
+      : !!address && address.documentId === documentId;
     if (own) {
-      bag.error('include/self', `<Include> cannot include an element of its own document ("${label}")`, node.pos, path);
+      bag.error(
+        'include/self',
+        `<Include> cannot include an element of its own document ("${label}")`,
+        node.pos,
+        path,
+      );
       continue;
     }
     if (!isRef(value) && !address) {
-      bag.error('ref/unresolved', `<Include of="${label}"> has no address`, node.pos, path);
+      bag.error(
+        'ref/unresolved',
+        `<Include of="${label}"> has no address`,
+        node.pos,
+        path,
+      );
       continue;
     }
     if (address && address.name === undefined) {
-      bag.error('include/whole-document', `<Include of="${label}"> must point to an element, not a whole document`, node.pos, path);
+      bag.error(
+        'include/whole-document',
+        `<Include of="${label}"> must point to an element, not a whole document`,
+        node.pos,
+        path,
+      );
       continue;
     }
     const targetDoc = address ? corpus?.get(address.documentId) : undefined;
     if (!address || !targetDoc) {
-      bag.error('include/unresolved', `<Include of="${label}"> points to a document that is not in the corpus`, node.pos, path);
+      bag.error(
+        'include/unresolved',
+        `<Include of="${label}"> points to a document that is not in the corpus`,
+        node.pos,
+        path,
+      );
       continue;
     }
     const name = address.name!;
     if (chain.includes(address.documentId)) {
-      bag.error('include/cycle', `<Include of="${label}"> creates an include cycle with document "${address.documentId}"`, node.pos, path);
+      bag.error(
+        'include/cycle',
+        `<Include of="${label}"> creates an include cycle with document "${address.documentId}"`,
+        node.pos,
+        path,
+      );
       continue;
     }
     let target: CompileResult;
     try {
-      target = await compileDocumentInSession(address.documentId, targetDoc, session, chain);
+      target = await compileDocumentInSession(
+        address.documentId,
+        targetDoc,
+        session,
+        chain,
+      );
     } catch (error) {
-      bag.error('include/failed', `<Include of="${label}">: document "${address.documentId}" failed to compile: ${errorMessage(error)}`, node.pos, path);
+      bag.error(
+        'include/failed',
+        `<Include of="${label}">: document "${address.documentId}" failed to compile: ${errorMessage(error)}`,
+        node.pos,
+        path,
+      );
       continue;
     }
     const source = target.refs.get(name);
     if (!source) {
-      bag.error('include/missing', `Document "${address.documentId}" has no element with ref "${name}"`, node.pos, path);
+      bag.error(
+        'include/missing',
+        `Document "${address.documentId}" has no element with ref "${name}"`,
+        node.pos,
+        path,
+      );
       continue;
     }
     const copy = cloneNode(source);
@@ -612,9 +851,18 @@ async function resolveIncludes(
       n.diagnostics = undefined;
       (getKit(n) ?? options.kit)?.onInclude?.(n);
     });
-    const extraMeta = (node.props.meta as Record<string, unknown> | undefined) ?? {};
-    copy.meta = { ...copy.meta, ...extraMeta, includedFrom: { documentId: address.documentId, name } };
-    Object.defineProperty(copy, INCLUDE_REF, { value: isRef(value) ? value : toRefTarget(value), enumerable: false, configurable: true });
+    const extraMeta =
+      (node.props.meta as Record<string, unknown> | undefined) ?? {};
+    copy.meta = {
+      ...copy.meta,
+      ...extraMeta,
+      includedFrom: { documentId: address.documentId, name },
+    };
+    Object.defineProperty(copy, INCLUDE_REF, {
+      value: isRef(value) ? value : toRefTarget(value),
+      enumerable: false,
+      configurable: true,
+    });
     if (node.pos) copy.pos = node.pos;
     parent.children![index] = copy;
   }
@@ -629,13 +877,21 @@ function copyHidden(from: AnyNode, to: AnyNode): void {
   const def = getDef(from);
   if (def) attachDef(to, def, getKit(from));
   const included = (from as unknown as Record<symbol, unknown>)[INCLUDE_REF];
-  if (included) Object.defineProperty(to, INCLUDE_REF, { value: included, enumerable: false, configurable: true });
+  if (included)
+    Object.defineProperty(to, INCLUDE_REF, {
+      value: included,
+      enumerable: false,
+      configurable: true,
+    });
   const a = from.children ?? [];
   const b = to.children ?? [];
   for (let i = 0; i < a.length; i++) copyHidden(a[i]!, b[i]!);
 }
 
-function applyNumbering(root: BaseNode, numbering: Readonly<Record<string, string>> | undefined): Map<string, number> {
+function applyNumbering(
+  root: BaseNode,
+  numbering: Readonly<Record<string, string>> | undefined,
+): Map<string, number> {
   const counters = new Map<string, number>();
   if (!numbering) return counters;
   walk(root, (node) => {
@@ -687,16 +943,25 @@ async function runHooks(
       try {
         results.set(h.name, await h.finish(ctx));
       } catch (error) {
-        bag.error('hook/failed', `Hook "${h.name}" failed: ${errorMessage(error)}`);
+        bag.error(
+          'hook/failed',
+          `Hook "${h.name}" failed: ${errorMessage(error)}`,
+        );
       }
     }
   }
   return results;
 }
 
-async function runDerive(root: BaseNode, hashes: ReadonlyMap<BaseNode, string>, options: CompileOptions, bag: DiagnosticBag): Promise<Map<string, unknown>> {
+async function runDerive(
+  root: BaseNode,
+  hashes: ReadonlyMap<BaseNode, string>,
+  options: CompileOptions,
+  bag: DiagnosticBag,
+): Promise<Map<string, unknown>> {
   const derived = new Map<string, unknown>();
-  const tasks: { key: string; node: BaseNode; fn: DeriveFn; path: string[] }[] = [];
+  const tasks: { key: string; node: BaseNode; fn: DeriveFn; path: string[] }[] =
+    [];
   const seen = new Set<string>();
   const visitNode = (node: AnyNode, ctx: { path: readonly string[] }) => {
     if (isTextNode(node)) return;
@@ -718,8 +983,11 @@ async function runDerive(root: BaseNode, hashes: ReadonlyMap<BaseNode, string>, 
   };
   // The tree, nodes stored in data (at any depth, including data of those nodes), and integrator extras.
   const visited = new Set<BaseNode>();
-  const queue: { node: BaseNode; prefix: readonly string[] }[] = [{ node: root, prefix: [] }];
-  for (const extra of options.deriveExtra?.(root) ?? []) queue.push({ node: extra, prefix: ['extra'] });
+  const queue: { node: BaseNode; prefix: readonly string[] }[] = [
+    { node: root, prefix: [] },
+  ];
+  for (const extra of options.deriveExtra?.(root) ?? [])
+    queue.push({ node: extra, prefix: ['extra'] });
   while (queue.length) {
     const { node: start, prefix } = queue.shift()!;
     if (visited.has(start)) continue;
@@ -727,12 +995,17 @@ async function runDerive(root: BaseNode, hashes: ReadonlyMap<BaseNode, string>, 
     walk(start, (node, ctx) => {
       visitNode(node, { path: [...prefix, ...ctx.path] });
       if (!isTextNode(node) && node.data !== undefined) {
-        for (const inner of nodesInData(node.data)) queue.push({ node: inner, prefix: [...prefix, ...ctx.path, 'data'] });
+        for (const inner of nodesInData(node.data))
+          queue.push({ node: inner, prefix: [...prefix, ...ctx.path, 'data'] });
       }
     });
   }
 
-  const ctx: DeriveContext = { context: options.context, signal: options.signal, resolve: options.resolve };
+  const ctx: DeriveContext = {
+    context: options.context,
+    signal: options.signal,
+    resolve: options.resolve,
+  };
   await runPool(
     tasks,
     options.concurrency,
@@ -741,7 +1014,12 @@ async function runDerive(root: BaseNode, hashes: ReadonlyMap<BaseNode, string>, 
         const value = await task.fn(task.node, ctx);
         derived.set(task.key, value === undefined ? null : value);
       } catch (error) {
-        bag.error('derive/failed', `<${task.node.type}> derive failed: ${errorMessage(error)}`, task.node.pos, task.path);
+        bag.error(
+          'derive/failed',
+          `<${task.node.type}> derive failed: ${errorMessage(error)}`,
+          task.node.pos,
+          task.path,
+        );
         derived.set(task.key, null);
       }
     },

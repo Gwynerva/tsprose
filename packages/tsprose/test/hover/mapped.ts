@@ -6,7 +6,9 @@ export interface Src {
   b?: number;
 }
 type Homomorphic<T> = { [K in keyof T]: T[K] };
-type WithAs<T> = { [K in keyof T as K extends 'a' ? K : never]: T[K] } & { [K in keyof T as K extends 'b' ? K : never]?: T[K] };
+type WithAs<T> = { [K in keyof T as K extends 'a' ? K : never]: T[K] } & {
+  [K in keyof T as K extends 'b' ? K : never]?: T[K];
+};
 type Simplify<T> = { [K in keyof T]: T[K] } & {};
 type Inter<T> = Pick<T, 'a'> & { extra: 1 };
 
@@ -20,10 +22,16 @@ export declare const v7: Omit<Src, never> & { x: 1 };
 export declare const v8: Pick<Src, 'a' | 'b'>;
 export declare const v9: { -readonly [K in keyof Src]: Src[K] };
 
-declare function constDef<const P extends Record<string, unknown>>(p: P): { [K in keyof P]: P[K] };
-declare function plainDef<P extends Record<string, unknown>>(p: P): { [K in keyof P]: P[K] };
+declare function constDef<const P extends Record<string, unknown>>(
+  p: P,
+): { [K in keyof P]: P[K] };
+declare function plainDef<P extends Record<string, unknown>>(
+  p: P,
+): { [K in keyof P]: P[K] };
 declare function identity<P extends Record<string, unknown>>(p: P): P;
-declare function nested<const P extends Record<string, unknown>>(def: { props: P }): { [K in keyof P]: P[K] };
+declare function nested<const P extends Record<string, unknown>>(def: {
+  props: P;
+}): { [K in keyof P]: P[K] };
 export const v10 = constDef({ /** doc-c */ c: 1 });
 export const v11 = plainDef({ /** doc-c */ c: 1 });
 export const v12 = identity({ /** doc-c */ c: 1 });
